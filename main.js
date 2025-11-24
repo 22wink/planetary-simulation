@@ -32,8 +32,11 @@
     // 初始化事件管理器
     const eventManager = new EventManager(scene, planetManager);
 
+    // 初始化可视化增强管理器
+    const visualizationManager = new VisualizationManager(scene, planetManager);
+
     // 初始化UI控制器
-    const uiController = new UIController(cameraController, planetManager, animationController, eventManager);
+    const uiController = new UIController(cameraController, planetManager, animationController, eventManager, visualizationManager);
     uiController.init(renderer, camera);
 
     // 动画循环
@@ -58,6 +61,9 @@
             // 更新事件管理器
             eventManager.update(cometManager);
         }
+        
+        // 更新可视化增强（始终更新，即使暂停）
+        visualizationManager.update();
         
         // 渲染场景（始终渲染，即使暂停）
         sceneManager.render();

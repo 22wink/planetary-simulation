@@ -1,10 +1,11 @@
 // UI控制模块 - 负责用户界面和交互
 class UIController {
-    constructor(cameraController, planetManager, animationController, eventManager = null) {
+    constructor(cameraController, planetManager, animationController, eventManager = null, visualizationManager = null) {
         this.cameraController = cameraController;
         this.planetManager = planetManager;
         this.animationController = animationController;
         this.eventManager = eventManager;
+        this.visualizationManager = visualizationManager;
         this.selectedPlanet = null;
         this.raycaster = new THREE.Raycaster();
         this.mouse = new THREE.Vector2();
@@ -94,6 +95,27 @@ class UIController {
             <div class="control-group">
                 <h3>事件历史</h3>
                 <button id="show-events-btn">查看事件历史</button>
+            </div>
+            ` : ''}
+            ${this.visualizationManager ? `
+            <div class="control-group">
+                <h3>可视化增强</h3>
+                <label class="toggle-label">
+                    <input type="checkbox" id="gravity-field-toggle">
+                    <span>引力场线</span>
+                </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="orbit-prediction-toggle">
+                    <span>轨道预测路径</span>
+                </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="constellations-toggle">
+                    <span>星座连线</span>
+                </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="planet-textures-toggle">
+                    <span>行星纹理</span>
+                </label>
             </div>
             ` : ''}
         `;
@@ -195,6 +217,38 @@ class UIController {
         
         // 初始化时间轴事件标记
         this.updateTimeSliderMarks();
+        
+        // 可视化增强控制
+        if (this.visualizationManager) {
+            const gravityFieldToggle = document.getElementById('gravity-field-toggle');
+            const orbitPredictionToggle = document.getElementById('orbit-prediction-toggle');
+            const constellationsToggle = document.getElementById('constellations-toggle');
+            const planetTexturesToggle = document.getElementById('planet-textures-toggle');
+            
+            if (gravityFieldToggle) {
+                gravityFieldToggle.addEventListener('change', (e) => {
+                    this.visualizationManager.toggleGravityField(e.target.checked);
+                });
+            }
+            
+            if (orbitPredictionToggle) {
+                orbitPredictionToggle.addEventListener('change', (e) => {
+                    this.visualizationManager.toggleOrbitPrediction(e.target.checked);
+                });
+            }
+            
+            if (constellationsToggle) {
+                constellationsToggle.addEventListener('change', (e) => {
+                    this.visualizationManager.toggleConstellations(e.target.checked);
+                });
+            }
+            
+            if (planetTexturesToggle) {
+                planetTexturesToggle.addEventListener('change', (e) => {
+                    this.visualizationManager.togglePlanetTextures(e.target.checked);
+                });
+            }
+        }
     }
 
     updateTimeScaleDisplay() {

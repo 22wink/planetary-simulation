@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>太阳系3D展示</title>
     <link rel="stylesheet" href="style.css">
+    <script src="/public/three.min.js"></script>
+    <script src="/public/OrbitControls.js"></script>
 </head>
 <body>
     <div id="canvas-container"></div>
@@ -13,8 +15,6 @@
         <p>使用鼠标拖动旋转视角 | 滚轮缩放 | 点击行星查看信息</p>
     </div>
     <div id="planet-info" class="planet-info"></div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <!-- 模块化文件，按依赖顺序加载 -->
     <script src="config.js"></script>
     <script src="SceneManager.js"></script>
@@ -24,6 +24,7 @@
     <script src="MeteorManager.js"></script>
     <script src="CometManager.js"></script>
     <script src="EventManager.js"></script>
+    <script src="VisualizationManager.js"></script>
     <script src="UIController.js"></script>
     <script src="main.js"></script>
 </body>
