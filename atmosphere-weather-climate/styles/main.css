@@ -1,0 +1,266 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Microsoft YaHei', 'SimHei', Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header {
+    text-align: center;
+    color: white;
+    margin-bottom: 30px;
+}
+
+.header h1 {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.subtitle {
+    font-size: 1.2em;
+    opacity: 0.9;
+}
+
+.nav-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 30px;
+    justify-content: center;
+}
+
+.tab-btn {
+    padding: 12px 24px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 25px;
+    color: white;
+    cursor: pointer;
+    font-size: 1em;
+    transition: all 0.3s;
+    backdrop-filter: blur(10px);
+}
+
+.tab-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+}
+
+.tab-btn.active {
+    background: white;
+    color: #667eea;
+    border-color: white;
+    font-weight: bold;
+}
+
+.main-content {
+    background: white;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+}
+
+.module {
+    display: none;
+}
+
+.module.active {
+    display: block;
+}
+
+.module h2 {
+    color: #667eea;
+    margin-bottom: 20px;
+    font-size: 2em;
+    border-bottom: 3px solid #667eea;
+    padding-bottom: 10px;
+}
+
+.module-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    align-items: start;
+}
+
+.visualization-container {
+    background: #f8f9fa;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+    min-height: 500px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.visualization-container > div[id$="-3d-container"] {
+    width: 100%;
+    height: 100%;
+    min-height: 500px;
+}
+
+canvas {
+    display: block;
+    border-radius: 10px;
+    background: white;
+}
+
+.info-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.info-section {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 10px;
+    border-left: 4px solid #667eea;
+}
+
+.info-section h3 {
+    color: #667eea;
+    margin-bottom: 10px;
+    font-size: 1.3em;
+}
+
+.info-section ul {
+    margin-left: 20px;
+    margin-top: 10px;
+}
+
+.info-section li {
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+
+.controls {
+    background: #e9ecef;
+    padding: 15px;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.btn {
+    padding: 10px 20px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: all 0.3s;
+}
+
+.btn:hover {
+    background: #5568d3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.motion-selector,
+.circulation-selector,
+.weather-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.motion-btn,
+.circ-btn,
+.weather-btn {
+    padding: 8px 16px;
+    background: #e9ecef;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 0.9em;
+}
+
+.motion-btn:hover,
+.circ-btn:hover,
+.weather-btn:hover {
+    background: #dee2e6;
+}
+
+.motion-btn.active,
+.circ-btn.active,
+.weather-btn.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+.climate-selector select {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    font-size: 1em;
+    margin-bottom: 20px;
+}
+
+.climate-chart {
+    margin-top: 20px;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    border: 2px solid #dee2e6;
+}
+
+input[type="range"] {
+    width: 100%;
+    margin: 10px 0;
+}
+
+input[type="checkbox"] {
+    margin-right: 8px;
+    transform: scale(1.2);
+}
+
+label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+@media (max-width: 968px) {
+    .module-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .visualization-container {
+        min-height: 400px;
+    }
+    
+    .header h1 {
+        font-size: 2em;
+    }
+    
+    .nav-tabs {
+        flex-direction: column;
+    }
+    
+    .tab-btn {
+        width: 100%;
+    }
+}

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大气圈与天气、气候 - 教学模块</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🌍 大气圈与天气、气候</h1>
+            <p class="subtitle">交互式地理教学模块</p>
+        </header>
+
+        <nav class="nav-tabs">
+            <button class="tab-btn active" data-module="atmosphere-layers">大气垂直分层</button>
+            <button class="tab-btn" data-module="heat-process">大气受热过程</button>
+            <button class="tab-btn" data-module="atmosphere-motion">大气运动</button>
+            <button class="tab-btn" data-module="global-circulation">全球性大气环流</button>
+            <button class="tab-btn" data-module="weather-systems">天气系统</button>
+            <button class="tab-btn" data-module="climate-types">气候类型</button>
+        </nav>
+
+        <main class="main-content">
+            <!-- 大气垂直分层模块 -->
+            <div id="atmosphere-layers" class="module active">
+                <h2>大气的垂直分层</h2>
+                <div class="module-content">
+                    <div class="visualization-container">
+                        <canvas id="layers-canvas"></canvas>
+                        <div id="layers-3d-container" style="display: none;"></div>
+                    </div>
+                    <div class="info-panel">
+                        <div class="info-section">
+                            <h3>对流层 (0-12km)</h3>
+                            <ul>
+                                <li>气温随高度升高递减（每100m约降0.6°C）</li>
+                                <li>对流运动显著</li>
+                                <li>天气现象复杂，云、雨、雪等主要发生在此层</li>
+                            </ul>
+                        </div>
+                        <div class="info-section">
+                            <h3>平流层 (12-50km)</h3>
+                            <ul>
+                                <li>气温随高度升高递增</li>
+                                <li>平流运动为主，适合飞机飞行</li>
+                                <li>含臭氧层（20-30km），吸收紫外线</li>
+                            </ul>
+                        </div>
+                        <div class="info-section">
+                            <h3>高层大气 (50km以上)</h3>
+                            <ul>
+                                <li>电离层反射无线电波</li>
+                                <li>极光现象发生在此层</li>
+                            </ul>
+                        </div>
+                        <div class="controls">
+                            <button id="view-toggle-layers" class="btn">切换到3D视图</button>
+                            <button id="animate-layers" class="btn">播放动画</button>
+                            <button id="reset-layers" class="btn">重置</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 大气受热过程模块 -->
+            <div id="heat-process" class="module">
+                <h2>大气受热过程</h2>
+                <div class="module-content">
+                    <div class="visualization-container">
+                        <canvas id="heat-canvas"></canvas>
+                    </div>
+                    <div class="info-panel">
+                        <div class="info-section">
+                            <h3>太阳辐射</h3>
+                            <p>短波辐射，大气主要直接热源是地面辐射，而非太阳辐射</p>
+                        </div>
+                        <div class="info-section">
+                            <h3>大气对太阳辐射的削弱作用</h3>
+                            <ul>
+                                <li><strong>吸收</strong>：臭氧吸收紫外线，水汽和CO₂吸收红外线</li>
+                                <li><strong>反射</strong>：云层和尘埃反射太阳辐射</li>
+                                <li><strong>散射</strong>：空气分子散射蓝光（天空呈蓝色）</li>
+                            </ul>
+                        </div>
+                        <div class="info-section">
+                            <h3>大气对地面的保温作用</h3>
+                            <ul>
+                                <li>大气逆辐射：地面辐射被大气吸收后，再以长波辐射形式返回地面</li>
+                                <li>阴天保温效果强，昼夜温差小</li>
+                                <li>应用：解释昼夜温差、温室效应、霜冻预警等</li>
+                            </ul>
+                        </div>
+                        <div class="controls">
+                            <label>
+                                <input type="checkbox" id="cloudy-mode"> 阴天模式
+                            </label>
+                            <button id="animate-heat" class="btn">播放动画</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 大气运动模块 -->
+            <div id="atmosphere-motion" class="module">
+                <h2>大气运动</h2>
+                <div class="module-content">
+                    <div class="visualization-container">
+                        <canvas id="motion-canvas"></canvas>
+                    </div>
+                    <div class="info-panel">
+                        <div class="motion-selector">
+                            <button class="motion-btn active" data-type="thermal">热力环流</button>
+                            <button class="motion-btn" data-type="sea-land">海陆风</button>
+                            <button class="motion-btn" data-type="valley">山谷风</button>
+                            <button class="motion-btn" data-type="wind-force">风的受力</button>
+                        </div>
+                        <div class="info-section" id="motion-info">
+                            <h3>热力环流</h3>
+                            <p>最基本的大气运动形式。受热地区空气上升，受冷地区空气下沉，形成环流。</p>
+                            <ul>
+                                <li><strong>海陆风</strong>：白天吹海风，夜晚吹陆风</li>
+                                <li><strong>山谷风</strong>：白天吹谷风，夜晚吹山风</li>
+                                <li><strong>城市风</strong>：城市热岛效应形成的环流</li>
+                            </ul>
+                        </div>
+                        <div class="controls">
+                            <label>
+                                时间：<input type="range" id="time-slider" min="0" max="24" value="12" step="0.5">
+                                <span id="time-display">12:00</span>
+                            </label>
+                            <button id="animate-motion" class="btn">播放动画</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 全球性大气环流模块 -->
+            <div id="global-circulation" class="module">
+                <h2>全球性大气环流</h2>
+                <div class="module-content">
+                    <div class="visualization-container">
+                        <canvas id="circulation-canvas"></canvas>
+                        <div id="circulation-3d-container" style="display: none;"></div>
+                    </div>
+                    <div class="info-panel">
+                        <div class="circulation-selector">
+                            <button class="circ-btn active" data-type="three-cell">三圈环流</button>
+                            <button class="circ-btn" data-type="pressure-belts">气压带风带</button>
+                            <button class="circ-btn" data-type="monsoon">季风环流</button>
+                        </div>
+                        <div class="info-section" id="circulation-info">
+                            <h3>三圈环流</h3>
+                            <p>低纬环流、中纬环流、高纬环流，形成：</p>
+                            <ul>
+                                <li>赤道低气压带</li>
+                                <li>副热带高气压带</li>
+                                <li>副极地低气压带</li>
+                                <li>极地高气压带</li>
+                            </ul>
+                        </div>
+                        <div class="controls">
+                            <button id="view-toggle-circulation" class="btn">切换到3D视图</button>
+                            <label>
+                                季节：
+                                <select id="season-selector">
+                                    <option value="spring">春季</option>
+                                    <option value="summer">夏季</option>
+                                    <option value="autumn">秋季</option>
+                                    <option value="winter">冬季</option>
+                                </select>
+                            </label>
+                            <button id="animate-circulation" class="btn">播放动画</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 天气系统模块 -->
+            <div id="weather-systems" class="module">
+                <h2>常见天气系统</h2>
+                <div class="module-content">
+                    <div class="visualization-container">
+                        <canvas id="weather-canvas"></canvas>
+                        <div id="weather-3d-container" style="display: none;"></div>
+                    </div>
+                    <div class="info-panel">
+                        <div class="weather-selector">
+                            <button class="weather-btn active" data-type="cold-front">冷锋</button>
+                            <button class="weather-btn" data-type="warm-front">暖锋</button>
+                            <button class="weather-btn" data-type="stationary-front">准静止锋</button>
+                            <button class="weather-btn" data-type="cyclone">气旋</button>
+                            <button class="weather-btn" data-type="anticyclone">反气旋</button>
+                            <button class="weather-btn" data-type="frontal-cyclone">锋面气旋</button>
+                        </div>
+                        <div class="info-section" id="weather-info">
+                            <h3>冷锋</h3>
+                            <ul>
+                                <li>冷气团主动向暖气团移动</li>
+                                <li>过境时：降温、大风、雨雪</li>
+                                <li>过境后：气压升高、气温降低</li>
+                            </ul>
+                        </div>
+                        <div class="controls">
+                            <button id="view-toggle-weather" class="btn">切换到3D视图</button>
+                            <button id="animate-weather" class="btn">播放动画</button>
+                            <button id="reset-weather" class="btn">重置</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 气候类型模块 -->
+            <div id="climate-types" class="module">
+                <h2>气候类型</h2>
+                <div class="module-content">
+                    <div class="visualization-container">
+                        <canvas id="climate-canvas"></canvas>
+                    </div>
+                    <div class="info-panel">
+                        <div class="climate-selector">
+                            <select id="climate-type-selector">
+                                <option value="">选择气候类型...</option>
+                                <option value="tropical-rainforest">热带雨林气候</option>
+                                <option value="tropical-savanna">热带草原气候</option>
+                                <option value="tropical-desert">热带沙漠气候</option>
+                                <option value="tropical-monsoon">热带季风气候</option>
+                                <option value="subtropical-monsoon">亚热带季风气候</option>
+                                <option value="mediterranean">地中海气候</option>
+                                <option value="temperate-monsoon">温带季风气候</option>
+                                <option value="temperate-oceanic">温带海洋性气候</option>
+                                <option value="temperate-continental">温带大陆性气候</option>
+                            </select>
+                        </div>
+                        <div class="info-section" id="climate-info">
+                            <p>请从下拉菜单中选择一种气候类型查看详细信息</p>
+                        </div>
+                        <div class="climate-chart">
+                            <canvas id="climate-chart-canvas"></canvas>
+                        </div>
+                        <div class="controls">
+                            <h3>气候类型判读方法</h3>
+                            <ul>
+                                <li><strong>以温定带</strong>：根据最冷月均温判断温度带</li>
+                                <li><strong>以水定型</strong>：根据降水特征判断气候类型</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/public/three.min.js"></script>
+    <script src="js/modules/Three3DRenderer.js"></script>
+    <script src="js/modules/AtmosphereLayers.js"></script>
+    <script src="js/modules/HeatProcess.js"></script>
+    <script src="js/modules/AtmosphereMotion.js"></script>
+    <script src="js/modules/GlobalCirculation.js"></script>
+    <script src="js/modules/WeatherSystems.js"></script>
+    <script src="js/modules/ClimateTypes.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
