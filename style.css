@@ -1,0 +1,446 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    overflow: hidden;
+    font-family: 'Arial', sans-serif;
+    background: #000;
+}
+
+#canvas-container {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+}
+
+.info {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: #fff;
+    z-index: 100;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.info h1 {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+    background: linear-gradient(90deg, #fff, #4fc3f7, #fff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: glow 3s ease-in-out infinite;
+}
+
+.info p {
+    font-size: 1em;
+    opacity: 0.8;
+}
+
+@keyframes glow {
+    0%, 100% {
+        filter: brightness(1);
+    }
+    50% {
+        filter: brightness(1.5);
+    }
+}
+
+/* 行星信息面板 */
+.planet-info {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    min-width: 250px;
+    display: none;
+    z-index: 200;
+    border: 2px solid rgba(79, 195, 247, 0.5);
+    box-shadow: 0 0 20px rgba(79, 195, 247, 0.3);
+}
+
+.planet-info h2 {
+    margin: 0 0 15px 0;
+    color: #4fc3f7;
+    font-size: 1.8em;
+    text-align: center;
+}
+
+.planet-info p {
+    margin: 10px 0;
+    line-height: 1.6;
+}
+
+.planet-info strong {
+    color: #4fc3f7;
+}
+
+.planet-info .info-section {
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(79, 195, 247, 0.2);
+}
+
+.planet-info .info-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.planet-info .info-section h3 {
+    margin: 0 0 10px 0;
+    color: #4fc3f7;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+/* 控制面板 */
+#control-panel {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    z-index: 200;
+    border: 2px solid rgba(79, 195, 247, 0.5);
+    box-shadow: 0 0 20px rgba(79, 195, 247, 0.3);
+    min-width: 200px;
+}
+
+.control-group {
+    margin-bottom: 20px;
+}
+
+.control-group:last-child {
+    margin-bottom: 0;
+}
+
+.control-group h3 {
+    margin: 0 0 10px 0;
+    color: #4fc3f7;
+    font-size: 1.2em;
+}
+
+#control-panel button {
+    background: rgba(79, 195, 247, 0.2);
+    border: 1px solid #4fc3f7;
+    color: #fff;
+    padding: 8px 15px;
+    margin: 5px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 0.9em;
+}
+
+#control-panel button:hover {
+    background: rgba(79, 195, 247, 0.4);
+    box-shadow: 0 0 10px rgba(79, 195, 247, 0.5);
+    transform: translateY(-2px);
+}
+
+#control-panel button:active {
+    transform: translateY(0);
+}
+
+.time-scale {
+    margin-top: 10px;
+    color: #4fc3f7;
+    font-weight: bold;
+}
+
+.time-jump-control {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(79, 195, 247, 0.3);
+}
+
+.time-jump-control label {
+    display: block;
+    margin-bottom: 8px;
+    color: #4fc3f7;
+    font-size: 0.9em;
+}
+
+.time-jump-control input[type="range"] {
+    width: 100%;
+    margin: 8px 0;
+    cursor: pointer;
+}
+
+.time-jump-control input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #4fc3f7;
+    cursor: pointer;
+    box-shadow: 0 0 5px rgba(79, 195, 247, 0.5);
+}
+
+.time-jump-control input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #4fc3f7;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 5px rgba(79, 195, 247, 0.5);
+}
+
+.time-jump-control input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px;
+    background: rgba(79, 195, 247, 0.3);
+    border-radius: 2px;
+}
+
+.time-jump-control input[type="range"]::-moz-range-track {
+    height: 4px;
+    background: rgba(79, 195, 247, 0.3);
+    border-radius: 2px;
+}
+
+.time-jump-control #time-jump-value {
+    display: inline-block;
+    margin-left: 10px;
+    color: #4fc3f7;
+    font-weight: bold;
+    min-width: 60px;
+}
+
+.time-jump-control #jump-time-btn {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+}
+
+/* 时间轴标记容器 */
+#time-slider-marks {
+    position: relative;
+    width: 100%;
+    height: 20px;
+    margin: 5px 0;
+    pointer-events: none;
+}
+
+/* 时间轴标记点 */
+.time-slider-mark {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transform: translateX(-50%);
+    cursor: pointer;
+    pointer-events: all;
+    box-shadow: 0 0 5px currentColor;
+    transition: all 0.2s ease;
+    z-index: 10;
+}
+
+.time-slider-mark:hover {
+    width: 12px;
+    height: 12px;
+    box-shadow: 0 0 10px currentColor;
+    transform: translateX(-50%) translateY(-2px);
+}
+
+/* 预设时间点按钮组 */
+.preset-time-buttons {
+    display: flex;
+    gap: 5px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.preset-time-btn {
+    flex: 1;
+    min-width: 60px;
+    padding: 6px 10px;
+    background: rgba(79, 195, 247, 0.1);
+    border: 1px solid rgba(79, 195, 247, 0.3);
+    color: #4fc3f7;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: all 0.2s ease;
+}
+
+.preset-time-btn:hover {
+    background: rgba(79, 195, 247, 0.2);
+    border-color: rgba(79, 195, 247, 0.5);
+    box-shadow: 0 0 10px rgba(79, 195, 247, 0.3);
+}
+
+.view-btn {
+    display: block;
+    width: 100%;
+    margin: 5px 0 !important;
+    text-align: left;
+}
+
+.moon-btn {
+    font-size: 0.85em !important;
+    padding: 6px 12px !important;
+}
+
+/* 事件通知 */
+.event-notification {
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.9);
+    color: #fff;
+    padding: 15px 20px;
+    border-radius: 10px;
+    border: 2px solid #00ff00;
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+    z-index: 1000;
+    min-width: 250px;
+    max-width: 350px;
+    transform: translateX(400px);
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+.event-notification.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.notification-content h4 {
+    margin: 0 0 8px 0;
+    color: #00ff00;
+    font-size: 1.3em;
+    text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+}
+
+.notification-content p {
+    margin: 0;
+    line-height: 1.5;
+    color: #fff;
+}
+
+/* 事件历史面板 */
+.event-history-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.9);
+    border: 2px solid #00ff00;
+    border-radius: 10px;
+    padding: 20px;
+    z-index: 2000;
+    min-width: 400px;
+    max-width: 600px;
+    max-height: 70vh;
+    display: none;
+    box-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
+}
+
+.event-history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #00ff00;
+}
+
+.event-history-header h3 {
+    margin: 0;
+    color: #00ff00;
+    text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+}
+
+#close-events-btn {
+    background: transparent;
+    border: 1px solid #00ff00;
+    color: #00ff00;
+    font-size: 24px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
+}
+
+#close-events-btn:hover {
+    background: rgba(0, 255, 0, 0.2);
+}
+
+.event-history-content {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.event-history-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.event-history-content::-webkit-scrollbar-track {
+    background: rgba(0, 255, 0, 0.1);
+    border-radius: 4px;
+}
+
+.event-history-content::-webkit-scrollbar-thumb {
+    background: rgba(0, 255, 0, 0.5);
+    border-radius: 4px;
+}
+
+.event-history-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 255, 0, 0.7);
+}
+
+.event-item {
+    background: rgba(0, 255, 0, 0.1);
+    border: 1px solid rgba(0, 255, 0, 0.3);
+    border-radius: 5px;
+    padding: 12px;
+    margin-bottom: 10px;
+}
+
+.event-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.event-type {
+    color: #00ff00;
+    font-weight: bold;
+    font-size: 1.1em;
+    text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+}
+
+.event-time {
+    color: #aaa;
+    font-size: 0.9em;
+}
+
+.event-description {
+    color: #fff;
+    line-height: 1.4;
+}
+
+.no-events {
+    text-align: center;
+    color: #888;
+    padding: 20px;
+    font-style: italic;
+}
+
