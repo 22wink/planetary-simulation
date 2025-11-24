@@ -121,12 +121,46 @@ class UIController {
         `;
         document.body.appendChild(panel);
         
+        // 创建独立的隐藏/显示按钮
+        const toggleBtn = document.createElement('button');
+        toggleBtn.id = 'toggle-panel-btn';
+        toggleBtn.textContent = '−';
+        toggleBtn.title = '隐藏控制面板';
+        toggleBtn.classList.add('in-panel'); // 初始状态在面板内
+        panel.appendChild(toggleBtn); // 将按钮添加到面板内
+        toggleBtn.addEventListener('click', () => {
+            this.toggleControlPanel();
+        });
+        
         // 绑定事件
         this.bindControlEvents();
         
         // 创建事件历史面板（隐藏）
         if (this.eventManager) {
             this.createEventHistoryPanel();
+        }
+    }
+    
+    toggleControlPanel() {
+        const panel = document.getElementById('control-panel');
+        const toggleBtn = document.getElementById('toggle-panel-btn');
+        if (!panel || !toggleBtn) return;
+        
+        const isHidden = panel.classList.contains('hidden');
+        if (isHidden) {
+            panel.classList.remove('hidden');
+            toggleBtn.textContent = '−';
+            toggleBtn.title = '隐藏控制面板';
+            toggleBtn.classList.add('in-panel');
+            // 将按钮移回面板内
+            panel.appendChild(toggleBtn);
+        } else {
+            panel.classList.add('hidden');
+            toggleBtn.textContent = '+';
+            toggleBtn.title = '显示控制面板';
+            toggleBtn.classList.remove('in-panel');
+            // 将按钮移到body，使其在面板隐藏时仍然可见
+            document.body.appendChild(toggleBtn);
         }
     }
 
@@ -348,6 +382,9 @@ class UIController {
                 if (this.eventManager) {
                     this.toggleEventHistory();
                 }
+                break;
+            case 'c': // C - 显示/隐藏控制面板
+                this.toggleControlPanel();
                 break;
             // 行星快捷键 (q=太阳, w=水星, e=金星, r=地球, t=火星, y=木星, u=土星, i=天王星, o=海王星)
             case 'q':

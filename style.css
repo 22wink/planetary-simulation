@@ -59,10 +59,33 @@ body {
     padding: 20px;
     border-radius: 10px;
     min-width: 250px;
+    max-width: 350px;
+    max-height: calc(100vh - 100px); /* 限制最大高度 */
     display: none;
     z-index: 200;
     border: 2px solid rgba(79, 195, 247, 0.5);
     box-shadow: 0 0 20px rgba(79, 195, 247, 0.3);
+    overflow-y: auto; /* 启用垂直滚动 */
+    overflow-x: hidden; /* 隐藏水平滚动 */
+}
+
+/* 行星信息面板滚动条样式 */
+.planet-info::-webkit-scrollbar {
+    width: 8px;
+}
+
+.planet-info::-webkit-scrollbar-track {
+    background: rgba(79, 195, 247, 0.1);
+    border-radius: 4px;
+}
+
+.planet-info::-webkit-scrollbar-thumb {
+    background: rgba(79, 195, 247, 0.5);
+    border-radius: 4px;
+}
+
+.planet-info::-webkit-scrollbar-thumb:hover {
+    background: rgba(79, 195, 247, 0.7);
 }
 
 .planet-info h2 {
@@ -113,6 +136,82 @@ body {
     border: 2px solid rgba(79, 195, 247, 0.5);
     box-shadow: 0 0 20px rgba(79, 195, 247, 0.3);
     min-width: 200px;
+    max-width: 300px;
+    max-height: calc(100vh - 100px); /* 限制最大高度 */
+    overflow-y: auto; /* 启用垂直滚动 */
+    overflow-x: hidden; /* 隐藏水平滚动 */
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* 控制面板隐藏状态 */
+#control-panel.hidden {
+    transform: translateX(calc(-100% - 20px));
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* 控制面板滚动条样式 */
+#control-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+#control-panel::-webkit-scrollbar-track {
+    background: rgba(79, 195, 247, 0.1);
+    border-radius: 4px;
+}
+
+#control-panel::-webkit-scrollbar-thumb {
+    background: rgba(79, 195, 247, 0.5);
+    border-radius: 4px;
+}
+
+#control-panel::-webkit-scrollbar-thumb:hover {
+    background: rgba(79, 195, 247, 0.7);
+}
+
+/* 控制面板隐藏/显示按钮 */
+#toggle-panel-btn {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(79, 195, 247, 0.2);
+    border: 1px solid #4fc3f7;
+    color: #fff;
+    width: 35px;
+    height: 35px;
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    transition: all 0.3s ease;
+    z-index: 201;
+    font-weight: bold;
+    line-height: 1;
+    box-shadow: 0 0 10px rgba(79, 195, 247, 0.3);
+}
+
+/* 当按钮在面板内部时 */
+#toggle-panel-btn.in-panel {
+    position: absolute;
+    bottom: auto;
+    left: auto;
+    top: 10px;
+    right: 10px;
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+}
+
+#toggle-panel-btn:hover {
+    background: rgba(79, 195, 247, 0.4);
+    box-shadow: 0 0 15px rgba(79, 195, 247, 0.6);
+    transform: scale(1.1);
+}
+
+#toggle-panel-btn:active {
+    transform: scale(0.95);
 }
 
 .control-group {
