@@ -23,6 +23,9 @@
         cometManager.createComet();
     }
 
+    // 初始化小行星管理器
+    const asteroidManager = new AsteroidManager(scene, planetManager);
+
     // 初始化动画控制器
     const animationController = new AnimationController();
 
@@ -35,12 +38,17 @@
     // 初始化可视化增强管理器
     const visualizationManager = new VisualizationManager(scene, planetManager);
 
+    // 初始化探测器管理器
+    const missionManager = new MissionManager(scene, planetManager);
+    missionManager.createMissions();
+    missionManager.setCamera(camera);
+
     // 初始化UI控制器
-    const uiController = new UIController(cameraController, planetManager, animationController, eventManager, visualizationManager);
+    const uiController = new UIController(cameraController, planetManager, animationController, eventManager, visualizationManager, missionManager);
     uiController.init(renderer, camera);
     
     // 初始化事件管理器（设置外部引用，需要在uiController之后）
-    eventManager.init(meteorManager, uiController);
+    eventManager.init(meteorManager, uiController, asteroidManager);
 
     // 动画循环
     function animate() {
@@ -60,6 +68,12 @@
             // 更新彗星
             const sunPosition = planetManager.sun ? planetManager.sun.position : new THREE.Vector3(0, 0, 0);
             cometManager.updateComets(animationController.timeScale, sunPosition);
+            
+            // 更新探测器
+            missionManager.updateMissions(animationController.timeScale);
+            
+            // 更新小行星
+            asteroidManager.updateAsteroids(animationController.timeScale);
             
             // 更新事件管理器
             eventManager.update(cometManager);

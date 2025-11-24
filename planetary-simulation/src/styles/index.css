@@ -185,6 +185,82 @@ body {
     line-height: 1.5;
 }
 
+/* 天文术语提示样式 */
+.terminology-tooltip {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.95);
+    color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    max-width: 350px;
+    z-index: 10000;
+    pointer-events: none;
+    box-shadow: 0 4px 20px rgba(79, 195, 247, 0.3);
+    border: 1px solid rgba(79, 195, 247, 0.5);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.terminology-tooltip .tooltip-header {
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(79, 195, 247, 0.3);
+}
+
+.terminology-tooltip .tooltip-header strong {
+    color: #4fc3f7;
+    font-size: 16px;
+}
+
+.terminology-tooltip .tooltip-content {
+    color: #e0e0e0;
+}
+
+.terminology-tooltip .tooltip-example {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(79, 195, 247, 0.2);
+    color: #b0b0b0;
+    font-style: italic;
+}
+
+/* 术语高亮样式 */
+[data-term] {
+    cursor: help;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-decoration-color: rgba(79, 195, 247, 0.6);
+    transition: all 0.2s ease;
+}
+
+[data-term]:hover {
+    color: #4fc3f7;
+    text-decoration-color: #4fc3f7;
+}
+
+/* 截图通知动画 */
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
 /* 控制面板 */
 #control-panel {
     position: absolute;
@@ -942,5 +1018,138 @@ body {
 
 .legend-label {
     color: #ccc;
+}
+
+/* 统计面板样式 */
+.statistics-panel {
+    position: fixed;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.95);
+    border: 2px solid #4fc3f7;
+    border-radius: 10px;
+    padding: 20px;
+    z-index: 2000;
+    min-width: 350px;
+    max-width: 400px;
+    max-height: 80vh;
+    display: none;
+    box-shadow: 0 0 30px rgba(79, 195, 247, 0.5);
+    overflow-y: auto;
+}
+
+.stats-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #4fc3f7;
+}
+
+.stats-header h3 {
+    margin: 0;
+    color: #4fc3f7;
+    text-shadow: 0 0 10px rgba(79, 195, 247, 0.5);
+}
+
+#close-stats-btn {
+    background: transparent;
+    border: 1px solid #4fc3f7;
+    color: #4fc3f7;
+    font-size: 24px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
+}
+
+#close-stats-btn:hover {
+    background: rgba(79, 195, 247, 0.2);
+}
+
+.stats-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: rgba(79, 195, 247, 0.1);
+    border-radius: 5px;
+    border: 1px solid rgba(79, 195, 247, 0.3);
+}
+
+.stat-label {
+    color: #4fc3f7;
+    font-size: 0.9em;
+}
+
+.stat-value {
+    color: #fff;
+    font-weight: bold;
+    font-size: 1em;
+}
+
+.stat-section {
+    margin-top: 10px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(79, 195, 247, 0.3);
+}
+
+.stat-section h4 {
+    color: #4fc3f7;
+    margin: 0 0 10px 0;
+    font-size: 1em;
+}
+
+.revolutions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.revolution-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    background: rgba(79, 195, 247, 0.05);
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+
+.revolution-planet {
+    color: #4fc3f7;
+    font-weight: bold;
+    min-width: 60px;
+}
+
+.revolution-count {
+    color: #fff;
+    font-weight: bold;
+}
+
+.revolution-period {
+    color: #aaa;
+    font-size: 0.85em;
+    margin-left: auto;
+}
+
+.no-data {
+    color: #888;
+    font-style: italic;
+    text-align: center;
+    padding: 10px;
 }
 

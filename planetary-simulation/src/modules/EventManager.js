@@ -10,12 +10,16 @@ class EventManager {
         this.meteorManager = null;  // 将在init中设置
         this.uiController = null;  // 将在init中设置
         this.activeMeteorShower = null;  // 当前活跃的流星雨
+        this.asteroidManager = null;  // 将在init中设置
+        // 行星逆行跟踪数据
+        this.retrogradeData = {};  // 存储每个行星的角位置历史
     }
 
     // 初始化方法（设置外部引用）
-    init(meteorManager, uiController) {
+    init(meteorManager, uiController, asteroidManager = null) {
         this.meteorManager = meteorManager;
         this.uiController = uiController;
+        this.asteroidManager = asteroidManager;
     }
 
     // 检测行星对齐（多颗行星接近一条线）
@@ -266,6 +270,237 @@ class EventManager {
             }
         }
     }
+    
+    // 检测行星凌日（水星/金星从太阳前方经过）
+    checkPlanetTransit() {
+        // 检查配置是否启用
+        if (!Config.events || !Config.events.planetTransit || !Config.events.planetTransit.enabled) {
+            return;
+        }
+        
+        const sunPos = this.planetManager.sun ? this.planetManager.sun.position : new THREE.Vector3(0, 0, 0);
+        const transitPlanets = Config.events.planetTransit.planets || ['水星', '金星'];
+        
+        transitPlanets.forEach(planetName => {
+            const planetPos = this.planetManager.getPlanetWorldPosition(planetName);
+            if (!planetPos) return;
+            
+            // 计算太阳-行星-地球的角度对齐
+            const earthPos = this.planetManager.getPlanetWorldPosition('地球');
+            if (!earthPos) return;
+            
+            const sunToPlanet = new THREE.Vector3().subVectors(planetPos, sunPos).normalize();
+            const planetToEarth = new THREE.Vector3().subVectors(earthPos, planetPos).normalize();
+            
+            // 计算对齐角度
+            const alignment = sunToPlanet.dot(planetToEarth);
+            const alignmentAngle = Math.acos(Math.max(-1, Math.min(1, alignment)));
+            
+            const threshold = Config.events.planetTransit.alignmentThreshold || 0.1;
+            
+            // 检查是否对齐（行星在太阳和地球之间）
+            if (alignmentAngle < threshold && alignment > 0.9) {
+                // 检查行星是否在太阳和地球之间
+                const sunToEarthDist = earthPos.distanceTo(sunPos);
+                const sunToPlanetDist = planetPos.distanceTo(sunPos);
+                const planetToEarthDist = planetPos.distanceTo(earthPos);
+                
+                // 行星应该在太阳和地球之间
+                if (sunToPlanetDist < sunToEarthDist && planetToEarthDist < sunToEarthDist) {
+                    const eventKey = `transit_${planetName}`;
+                    const existingEvent = this.activeEvents.find(e => e.key === eventKey);
+                    
+                    if (!existingEvent) {
+                        // 计算行星在太阳表面的投影位置（用于显示黑点）
+                        const sunToPlanetDir = new THREE.Vector3().subVectors(planetPos, sunPos).normalize();
+                        const projectionDistance = 20; // 太阳半径约为20
+                        const projectionPos = new THREE.Vector3().addVectors(sunPos, sunToPlanetDir.multiplyScalar(projectionDistance));
+                        
+                        this.triggerEvent('planet_transit', {
+                            planet: planetName,
+                            planetPosition: planetPos.clone(),
+                            sunPosition: sunPos.clone(),
+                            earthPosition: earthPos.clone(),
+                            projectionPosition: projectionPos,
+                            alignment: alignment,
+                            alignmentAngle: alignmentAngle
+                        }, eventKey);
+                    }
+                }
+            }
+        });
+    }
+
+    // 检测行星逆行现象
+    checkRetrograde() {
+        // 检查配置是否启用
+        if (!Config.events || !Config.events.retrograde || !Config.events.retrograde.enabled) {
+            return;
+        }
+
+        const earthPos = this.planetManager.getPlanetWorldPosition('地球');
+        if (!earthPos) return;
+
+        const retrogradePlanets = Config.events.retrograde.planets || ['火星', '木星', '土星', '天王星', '海王星'];
+        
+        retrogradePlanets.forEach(planetName => {
+            const planetPos = this.planetManager.getPlanetWorldPosition(planetName);
+            if (!planetPos) return;
+
+            // 计算行星相对于地球的角位置（从地球看行星的方向）
+            const earthToPlanet = new THREE.Vector3().subVectors(planetPos, earthPos);
+            const angle = Math.atan2(earthToPlanet.z, earthToPlanet.x); // 角度范围 [-π, π]
+            
+            // 初始化跟踪数据
+            if (!this.retrogradeData[planetName]) {
+                this.retrogradeData[planetName] = {
+                    lastAngle: angle,
+                    angularVelocity: 0,
+                    isRetrograde: false,
+                    lastUpdate: Date.now()
+                };
+                return;
+            }
+
+            const data = this.retrogradeData[planetName];
+            const now = Date.now();
+            const deltaTime = (now - data.lastUpdate) / 1000; // 秒
+            
+            if (deltaTime < 0.1) return; // 避免过于频繁的更新
+            
+            // 计算角度变化（处理角度跨越-π到π的边界）
+            let angleDiff = angle - data.lastAngle;
+            if (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+            if (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+            
+            // 计算角速度（弧度/秒）
+            const angularVelocity = angleDiff / deltaTime;
+            
+            // 检测逆行：角速度从正变负（或持续为负）
+            const wasRetrograde = data.isRetrograde;
+            data.isRetrograde = angularVelocity < -0.0001; // 负角速度表示逆行
+            
+            // 如果刚刚开始逆行
+            if (data.isRetrograde && !wasRetrograde) {
+                const eventKey = `retrograde_${planetName}`;
+                const existingEvent = this.activeEvents.find(e => e.key === eventKey);
+                
+                if (!existingEvent) {
+                    this.triggerEvent('retrograde', {
+                        planet: planetName,
+                        planetPosition: planetPos.clone(),
+                        earthPosition: earthPos.clone(),
+                        angularVelocity: angularVelocity
+                    }, eventKey);
+                }
+            }
+            
+            // 如果逆行结束
+            if (!data.isRetrograde && wasRetrograde) {
+                const eventKey = `retrograde_${planetName}`;
+                const existingEvent = this.activeEvents.find(e => e.key === eventKey);
+                if (existingEvent) {
+                    this.removeEvent(eventKey);
+                }
+            }
+            
+            // 更新数据
+            data.lastAngle = angle;
+            data.angularVelocity = angularVelocity;
+            data.lastUpdate = now;
+        });
+    }
+
+    // 检测大合相（3颗以上行星接近对齐）
+    checkGrandConjunction() {
+        // 检查配置是否启用
+        if (!Config.events || !Config.events.grandConjunction || !Config.events.grandConjunction.enabled) {
+            return;
+        }
+
+        const planets = this.planetManager.planets;
+        const minPlanets = Config.events.grandConjunction.minPlanets || 3;
+        const threshold = Config.events.grandConjunction.threshold || 60;
+        const angleThreshold = Config.events.grandConjunction.angleThreshold || 0.2;
+
+        if (planets.length < minPlanets) return;
+
+        // 获取所有行星位置
+        const planetPositions = planets.map(p => {
+            const planet = p.children[0];
+            const pos = this.planetManager.getPlanetWorldPosition(planet.userData.name);
+            return pos ? { name: planet.userData.name, position: pos } : null;
+        }).filter(p => p !== null);
+
+        if (planetPositions.length < minPlanets) return;
+
+        // 检查所有可能的组合（至少minPlanets颗行星）
+        for (let count = minPlanets; count <= planetPositions.length; count++) {
+            // 生成所有可能的组合
+            const combinations = this.getCombinations(planetPositions, count);
+            
+            for (const combo of combinations) {
+                // 检查这些行星是否接近对齐
+                if (this.arePlanetsAligned(combo, threshold, angleThreshold)) {
+                    const planetNames = combo.map(p => p.name);
+                    const eventKey = `grand_conjunction_${planetNames.sort().join('_')}`;
+                    const existingEvent = this.activeEvents.find(e => e.key === eventKey);
+                    
+                    if (!existingEvent) {
+                        this.triggerEvent('grand_conjunction', {
+                            planets: planetNames,
+                            positions: combo.map(p => p.position.clone()),
+                            count: count
+                        }, eventKey);
+                    }
+                }
+            }
+        }
+    }
+
+    // 获取组合（辅助函数）
+    getCombinations(arr, k) {
+        if (k === 1) return arr.map(x => [x]);
+        const combinations = [];
+        for (let i = 0; i <= arr.length - k; i++) {
+            const head = arr[i];
+            const tailCombos = this.getCombinations(arr.slice(i + 1), k - 1);
+            for (const combo of tailCombos) {
+                combinations.push([head, ...combo]);
+            }
+        }
+        return combinations;
+    }
+
+    // 检查行星是否对齐（辅助函数）
+    arePlanetsAligned(planets, distanceThreshold, angleThreshold) {
+        if (planets.length < 3) return false;
+        
+        // 计算所有行星的中心点
+        const center = new THREE.Vector3();
+        planets.forEach(p => center.add(p.position));
+        center.divideScalar(planets.length);
+        
+        // 检查所有行星是否都在中心点附近
+        for (const planet of planets) {
+            if (planet.position.distanceTo(center) > distanceThreshold) {
+                return false;
+            }
+        }
+        
+        // 检查角度对齐（计算所有行星相对于中心的角度）
+        const angles = planets.map(p => {
+            const dir = new THREE.Vector3().subVectors(p.position, center).normalize();
+            return Math.atan2(dir.z, dir.x);
+        });
+        
+        // 检查角度是否接近（允许一定范围）
+        angles.sort((a, b) => a - b);
+        const maxAngleDiff = Math.max(...angles) - Math.min(...angles);
+        
+        // 如果角度差小于阈值，或者角度跨越了-π到π的边界
+        return maxAngleDiff < angleThreshold || (2 * Math.PI - maxAngleDiff) < angleThreshold;
+    }
 
     // 触发事件
     triggerEvent(type, data, key = null) {
@@ -289,8 +524,12 @@ class EventManager {
         // 添加通知
         this.addNotification(event);
 
-        // 自动移除事件（日食和月食持续时间更长）
-        const duration = (event.type === 'solar_eclipse' || event.type === 'lunar_eclipse') ? 10000 : 5000;
+        // 自动移除事件（日食和月食持续时间更长，行星凌日持续时间中等，逆行持续时间长）
+        const duration = (event.type === 'solar_eclipse' || event.type === 'lunar_eclipse') ? 10000 : 
+                        (event.type === 'planet_transit') ? 8000 :
+                        (event.type === 'retrograde') ? 15000 : // 逆行持续时间较长
+                        (event.type === 'grand_conjunction') ? 12000 : // 大合相持续时间较长
+                        5000;
         setTimeout(() => {
             this.removeEvent(event.key);
         }, duration);
@@ -395,6 +634,137 @@ class EventManager {
                     event.moon = moon;
                 }
             }
+        } else if (event.type === 'planet_transit') {
+            // 行星凌日视觉效果
+            const showHighlight = Config.events?.planetTransit?.showHighlight !== false;
+            if (showHighlight) {
+                // 在太阳表面创建黑点（表示行星）
+                const planetSize = event.data.planet === '水星' ? 0.38 : 0.95; // 行星相对大小
+                const dotSize = planetSize * 0.5; // 在太阳表面的显示大小
+                
+                const dotGeometry = new THREE.CircleGeometry(dotSize, 16);
+                const dotMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x000000,
+                    transparent: true,
+                    opacity: 0.9,
+                    side: THREE.DoubleSide
+                });
+                const dot = new THREE.Mesh(dotGeometry, dotMaterial);
+                
+                // 将黑点放置在太阳表面（投影位置）
+                dot.position.copy(event.data.projectionPosition);
+                // 让黑点面向相机（朝向太阳中心的反方向）
+                const sunToDot = new THREE.Vector3().subVectors(dot.position, event.data.sunPosition).normalize();
+                dot.lookAt(dot.position.clone().add(sunToDot));
+                
+                dot.userData.isEventHighlight = true;
+                dot.userData.eventKey = event.key;
+                this.scene.add(dot);
+                event.transitDot = dot;
+                
+                // 创建连接线（从太阳到行星）
+                const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+                    event.data.sunPosition,
+                    event.data.planetPosition
+                ]);
+                const lineMaterial = new THREE.LineBasicMaterial({
+                    color: 0xffff00,
+                    transparent: true,
+                    opacity: 0.4,
+                    linewidth: 1
+                });
+                const line = new THREE.Line(lineGeometry, lineMaterial);
+                line.userData.isEventHighlight = true;
+                line.userData.eventKey = event.key;
+                this.scene.add(line);
+                    event.transitLine = line;
+            }
+        } else if (event.type === 'retrograde') {
+            // 行星逆行视觉效果
+            const showHighlight = Config.events?.retrograde?.showHighlight !== false;
+            if (showHighlight) {
+                const planetGroup = this.planetManager.getPlanetByName(event.data.planet);
+                if (planetGroup) {
+                    const planet = planetGroup.children[0];
+                    const originalColor = planet.material.color.getHex();
+                    event.originalPlanetColor = originalColor;
+                    
+                    // 创建闪烁效果（改变颜色为红色/橙色）
+                    const retrogradeColor = 0xff6600; // 橙色
+                    planet.material.color.setHex(retrogradeColor);
+                    event.retrogradePlanet = planet;
+                    
+                    // 创建高亮环
+                    const ringGeometry = new THREE.RingGeometry(
+                        planet.userData.size * 1.5,
+                        planet.userData.size * 2.0,
+                        32
+                    );
+                    const ringMaterial = new THREE.MeshBasicMaterial({
+                        color: 0xff6600,
+                        transparent: true,
+                        opacity: 0.6,
+                        side: THREE.DoubleSide
+                    });
+                    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                    ring.position.copy(event.data.planetPosition);
+                    ring.lookAt(0, 0, 0);
+                    ring.userData.isEventHighlight = true;
+                    ring.userData.eventKey = event.key;
+                    this.scene.add(ring);
+                    event.retrogradeRing = ring;
+                }
+            }
+        } else if (event.type === 'grand_conjunction') {
+            // 大合相视觉效果
+            const showHighlight = Config.events?.grandConjunction?.showHighlight !== false;
+            if (showHighlight) {
+                // 创建金色连线连接所有对齐的行星
+                const positions = event.data.positions;
+                if (positions.length >= 3) {
+                    // 创建连接所有行星的线
+                    const points = positions;
+                    const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+                    const lineMaterial = new THREE.LineBasicMaterial({
+                        color: 0xffd700, // 金色
+                        transparent: true,
+                        opacity: 0.8,
+                        linewidth: 3
+                    });
+                    const line = new THREE.Line(lineGeometry, lineMaterial);
+                    line.userData.isEventHighlight = true;
+                    line.userData.eventKey = event.key;
+                    this.scene.add(line);
+                    event.conjunctionLine = line;
+                    
+                    // 为每颗行星创建金色高亮环
+                    event.conjunctionRings = [];
+                    positions.forEach((pos, index) => {
+                        const planetGroup = this.planetManager.getPlanetByName(event.data.planets[index]);
+                        if (planetGroup) {
+                            const planet = planetGroup.children[0];
+                            const ringGeometry = new THREE.RingGeometry(
+                                planet.userData.size * 1.3,
+                                planet.userData.size * 1.8,
+                                32
+                            );
+                            const ringMaterial = new THREE.MeshBasicMaterial({
+                                color: 0xffd700, // 金色
+                                transparent: true,
+                                opacity: 0.7,
+                                side: THREE.DoubleSide
+                            });
+                            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                            ring.position.copy(pos);
+                            ring.lookAt(0, 0, 0);
+                            ring.userData.isEventHighlight = true;
+                            ring.userData.eventKey = event.key;
+                            this.scene.add(ring);
+                            event.conjunctionRings.push(ring);
+                        }
+                    });
+                }
+            }
         }
     }
 
@@ -425,6 +795,46 @@ class EventManager {
             // 恢复月球颜色（月食）
             if (event.type === 'lunar_eclipse' && event.originalMoonColor !== undefined && event.moon) {
                 event.moon.material.color.setHex(event.originalMoonColor);
+            }
+            
+            // 移除行星凌日视觉效果
+            if (event.type === 'planet_transit') {
+                if (event.transitDot) {
+                    this.scene.remove(event.transitDot);
+                    event.transitDot.geometry.dispose();
+                    event.transitDot.material.dispose();
+                }
+                if (event.transitLine) {
+                    this.scene.remove(event.transitLine);
+                    event.transitLine.geometry.dispose();
+                    event.transitLine.material.dispose();
+                }
+            }
+            
+            // 恢复行星颜色（逆行）
+            if (event.type === 'retrograde' && event.originalPlanetColor !== undefined && event.retrogradePlanet) {
+                event.retrogradePlanet.material.color.setHex(event.originalPlanetColor);
+            }
+            if (event.retrogradeRing) {
+                this.scene.remove(event.retrogradeRing);
+                event.retrogradeRing.geometry.dispose();
+                event.retrogradeRing.material.dispose();
+            }
+            
+            // 移除大合相视觉效果
+            if (event.type === 'grand_conjunction') {
+                if (event.conjunctionLine) {
+                    this.scene.remove(event.conjunctionLine);
+                    event.conjunctionLine.geometry.dispose();
+                    event.conjunctionLine.material.dispose();
+                }
+                if (event.conjunctionRings) {
+                    event.conjunctionRings.forEach(ring => {
+                        this.scene.remove(ring);
+                        ring.geometry.dispose();
+                        ring.material.dispose();
+                    });
+                }
             }
 
             this.activeEvents.splice(index, 1);
@@ -461,6 +871,18 @@ class EventManager {
                 title = '流星雨高峰期！';
                 message = `${event.data.name}正在发生：${event.data.description}`;
                 break;
+            case 'planet_transit':
+                title = '行星凌日！';
+                message = `${event.data.planet}正在从太阳前方经过，在太阳表面可以看到一个小黑点`;
+                break;
+            case 'retrograde':
+                title = '行星逆行！';
+                message = `${event.data.planet}正在逆行，从地球视角看它在天空中向后移动`;
+                break;
+            case 'grand_conjunction':
+                title = '罕见的大合相！';
+                message = `${event.data.count}颗行星（${event.data.planets.join('、')}）正在接近对齐，这是罕见的天文现象`;
+                break;
         }
 
         this.notificationQueue.push({ title, message, timestamp: Date.now() });
@@ -475,6 +897,12 @@ class EventManager {
             eventConfigKey = 'lunarEclipse';
         } else if (event.type === 'meteor_shower') {
             eventConfigKey = 'meteorShower';
+        } else if (event.type === 'planet_transit') {
+            eventConfigKey = 'planetTransit';
+        } else if (event.type === 'retrograde') {
+            eventConfigKey = 'retrograde';
+        } else if (event.type === 'grand_conjunction') {
+            eventConfigKey = 'grandConjunction';
         }
         
         const eventConfig = Config.events?.[eventConfigKey];
@@ -512,10 +940,14 @@ class EventManager {
 
     // 更新事件（每帧调用）
     update(cometManager) {
-        // 清理过期事件（日食和月食持续时间更长）
+        // 清理过期事件（日食和月食持续时间更长，行星凌日持续时间中等，逆行持续时间长）
         this.activeEvents = this.activeEvents.filter(event => {
             const age = Date.now() - event.timestamp;
-            const maxAge = (event.type === 'solar_eclipse' || event.type === 'lunar_eclipse') ? 10000 : 5000;
+            const maxAge = (event.type === 'solar_eclipse' || event.type === 'lunar_eclipse') ? 10000 : 
+                          (event.type === 'planet_transit') ? 8000 :
+                          (event.type === 'retrograde') ? 15000 :
+                          (event.type === 'grand_conjunction') ? 12000 :
+                          5000;
             return age < maxAge;
         });
 
@@ -552,6 +984,97 @@ class EventManager {
         if (Math.random() < meteorShowerFreq) {
             this.checkMeteorShower();
         }
+        
+        // 检测行星凌日
+        const transitFreq = Config.events?.planetTransit?.checkFrequency || 0.15;
+        if (Math.random() < transitFreq) {
+            this.checkPlanetTransit();
+        }
+
+        // 检测行星逆行
+        const retrogradeFreq = Config.events?.retrograde?.checkFrequency || 0.2;
+        if (Math.random() < retrogradeFreq) {
+            this.checkRetrograde();
+        }
+
+        // 检测大合相
+        const grandConjunctionFreq = Config.events?.grandConjunction?.checkFrequency || 0.05;
+        if (Math.random() < grandConjunctionFreq) {
+            this.checkGrandConjunction();
+        }
+
+        // 检测小行星接近
+        const asteroidFreq = Config.events?.asteroidApproach?.checkFrequency || 0.02;
+        if (this.asteroidManager && Math.random() < asteroidFreq) {
+            this.checkAsteroidApproach();
+        }
+    }
+    
+    // 检测小行星接近事件
+    checkAsteroidApproach() {
+        const config = Config.events?.asteroidApproach;
+        if (!config || !config.enabled || !this.asteroidManager) {
+            return;
+        }
+
+        this.asteroidManager.asteroids.forEach(asteroid => {
+            const data = asteroid.userData;
+            const distance = data.currentDistance;
+            
+            // 检查是否接近地球
+            if (distance < config.safeDistance && distance > 0) {
+                const eventKey = `asteroid_${asteroid.userData.name}`;
+                
+                // 检查是否已经触发过这个事件
+                const existingEvent = this.activeEvents.find(e => e.key === eventKey);
+                if (!existingEvent) {
+                    // 触发小行星接近事件
+                    const level = data.dangerLevel;
+                    let message = '';
+                    let color = '#888888';
+                    
+                    if (level === 'danger') {
+                        message = `⚠️ 危险！${data.name}正在接近地球！`;
+                        color = '#ff0000';
+                    } else if (level === 'warning') {
+                        message = `⚠️ 警告：${data.name}接近中`;
+                        color = '#ffff00';
+                    } else {
+                        message = `${data.name}正在接近地球`;
+                        color = '#00ff00';
+                    }
+                    
+                    this.triggerEvent('asteroid_approach', {
+                        name: data.name,
+                        distance: distance.toFixed(2),
+                        dangerLevel: level,
+                        message: message,
+                        color: color
+                    }, eventKey);
+                    
+                    // 高亮小行星
+                    if (config.showHighlight) {
+                        this.highlightAsteroid(asteroid, level);
+                    }
+                }
+            }
+        });
+    }
+    
+    // 高亮小行星
+    highlightAsteroid(asteroid, level) {
+        const data = asteroid.userData;
+        if (!data.glow) return;
+        
+        // 增强发光效果
+        data.glow.material.opacity = 0.6;
+        
+        // 3秒后恢复
+        setTimeout(() => {
+            if (data.glow) {
+                data.glow.material.opacity = 0.3;
+            }
+        }, 3000);
     }
 
     // 检测流星雨（基于模拟时间）

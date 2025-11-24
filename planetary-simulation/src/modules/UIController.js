@@ -1,11 +1,12 @@
 // UI控制模块 - 负责用户界面和交互
 class UIController {
-    constructor(cameraController, planetManager, animationController, eventManager = null, visualizationManager = null) {
+    constructor(cameraController, planetManager, animationController, eventManager = null, visualizationManager = null, missionManager = null) {
         this.cameraController = cameraController;
         this.planetManager = planetManager;
         this.animationController = animationController;
         this.eventManager = eventManager;
         this.visualizationManager = visualizationManager;
+        this.missionManager = missionManager;
         this.selectedPlanet = null;
         this.raycaster = new THREE.Raycaster();
         this.mouse = new THREE.Vector2();
@@ -19,11 +20,22 @@ class UIController {
             maxDataPoints: 100 // 保留最近100个数据点
         };
         this.chartUpdateInterval = null;
+        
+        // 统计数据
+        this.statistics = {
+            startTime: Date.now(), // 开始运行时间
+            totalEvents: 0, // 总事件数
+            cometCount: 0, // 观察到的彗星数量
+            planetRevolutions: {} // 每个行星的公转圈数 { planetName: count }
+        };
     }
 
     init(renderer, camera) {
         this.renderer = renderer;
         this.camera = camera;
+        
+        // 初始化术语管理器
+        this.terminologyManager = new TerminologyManager();
         
         // 创建控制面板
         this.createControlPanel();
@@ -109,7 +121,22 @@ class UIController {
             <div class="control-group">
                 <h3>数据可视化</h3>
                 <button id="show-charts-btn">实时数据图表</button>
+                <button id="show-stats-btn">统计面板</button>
             </div>
+            <div class="control-group">
+                <h3>工具</h3>
+                <button id="screenshot-btn">📷 截图</button>
+            </div>
+            ${this.missionManager ? `
+            <div class="control-group">
+                <h3>太空探测器</h3>
+                <label class="toggle-label">
+                    <input type="checkbox" id="missions-toggle" checked>
+                    <span>显示探测器</span>
+                </label>
+                <button id="show-missions-btn">探测器信息</button>
+            </div>
+            ` : ''}
             ${this.visualizationManager ? `
             <div class="control-group">
                 <h3>可视化增强</h3>
@@ -156,6 +183,9 @@ class UIController {
         
         // 创建数据图表面板
         this.createDataChartsPanel();
+        
+        // 创建统计面板
+        this.createStatisticsPanel();
     }
     
     toggleControlPanel() {
@@ -250,6 +280,41 @@ class UIController {
             showChartsBtn.addEventListener('click', () => {
                 this.toggleDataCharts();
             });
+        }
+        
+        // 显示统计面板按钮
+        const showStatsBtn = document.getElementById('show-stats-btn');
+        if (showStatsBtn) {
+            showStatsBtn.addEventListener('click', () => {
+                this.toggleStatisticsPanel();
+            });
+        }
+        
+        // 截图按钮
+        const screenshotBtn = document.getElementById('screenshot-btn');
+        if (screenshotBtn) {
+            screenshotBtn.addEventListener('click', () => {
+                this.takeScreenshot();
+            });
+        }
+        
+        // 探测器相关按钮
+        if (this.missionManager) {
+            // 显示/隐藏探测器
+            const missionsToggle = document.getElementById('missions-toggle');
+            if (missionsToggle) {
+                missionsToggle.addEventListener('change', (e) => {
+                    this.missionManager.toggleMissions(e.target.checked);
+                });
+            }
+            
+            // 显示探测器信息
+            const showMissionsBtn = document.getElementById('show-missions-btn');
+            if (showMissionsBtn) {
+                showMissionsBtn.addEventListener('click', () => {
+                    this.toggleMissionsPanel();
+                });
+            }
         }
         
         // 时间跳跃滑块
@@ -478,12 +543,39 @@ class UIController {
         // 更新模拟时间
         this.simulationTime = days;
         
-        // 更新小行星带
+        // 更新小行星带（使用新的轨道参数）
         this.planetManager.asteroidBelt.forEach((asteroid) => {
-            asteroid.userData.angle = targetAngle * (asteroid.userData.orbitSpeed / Config.planetData[0].speed);
-            const radius = asteroid.userData.radius;
-            asteroid.position.x = Math.cos(asteroid.userData.angle) * radius;
-            asteroid.position.z = Math.sin(asteroid.userData.angle) * radius;
+            const data = asteroid.userData;
+            if (data.semiMajorAxis) {
+                // 新轨道系统：更新真近点角
+                const speedRatio = data.speed / Config.planetData[0].speed;
+                data.trueAnomaly = targetAngle * speedRatio;
+                
+                // 使用开普勒轨道方程计算位置
+                const r = data.semiMajorAxis * (1 - data.eccentricity * data.eccentricity) / 
+                         (1 + data.eccentricity * Math.cos(data.trueAnomaly));
+                
+                // 应用轨道倾角和升交点经度
+                const cosInclination = Math.cos(data.inclination);
+                const sinInclination = Math.sin(data.inclination);
+                const cosNode = Math.cos(data.longitudeOfAscendingNode);
+                const sinNode = Math.sin(data.longitudeOfAscendingNode);
+                const cosAnomaly = Math.cos(data.trueAnomaly + data.argumentOfPeriapsis);
+                const sinAnomaly = Math.sin(data.trueAnomaly + data.argumentOfPeriapsis);
+                
+                const xOrbital = r * cosAnomaly;
+                const yOrbital = r * sinAnomaly;
+                
+                asteroid.position.x = xOrbital * cosNode - yOrbital * sinNode * cosInclination;
+                asteroid.position.y = yOrbital * sinInclination;
+                asteroid.position.z = xOrbital * sinNode + yOrbital * cosNode * cosInclination;
+            } else {
+                // 兼容旧系统（如果还有旧数据）
+                data.angle = targetAngle * (data.orbitSpeed / Config.planetData[0].speed);
+                const radius = data.radius;
+                asteroid.position.x = Math.cos(data.angle) * radius;
+                asteroid.position.z = Math.sin(data.angle) * radius;
+            }
         });
     }
 
@@ -532,8 +624,8 @@ class UIController {
                         <p><strong>密度:</strong> ${detailedData.density}</p>
                         <p><strong>表面温度:</strong> ${detailedData.surfaceTemp}</p>
                         <p><strong>大气成分:</strong> ${detailedData.atmosphere}</p>
-                        <p><strong>公转周期:</strong> ${detailedData.orbitalPeriod}</p>
-                        <p><strong>自转周期:</strong> ${detailedData.rotationPeriod}</p>
+                    <p><strong><span data-term="轨道周期">公转周期</span>:</strong> ${detailedData.orbitalPeriod}</p>
+                    <p><strong><span data-term="自转周期">自转周期</span>:</strong> ${detailedData.rotationPeriod}</p>
                         <p><strong>卫星数量:</strong> ${detailedData.moons}</p>
                     </div>
                     ${detailedData.facts && detailedData.facts.length > 0 ? `
@@ -565,8 +657,8 @@ class UIController {
                 <div class="info-section">
                     <h3>基本信息</h3>
                     <p><strong>轨道距离:</strong> ${planetData.distance.toFixed(1)} 单位</p>
-                    <p><strong>公转速度:</strong> ${(planetData.speed * 100).toFixed(3)}</p>
-                    <p><strong>自转速度:</strong> ${(planetData.rotationSpeed * 100).toFixed(3)}</p>
+                    <p><strong><span data-term="公转">公转</span>速度:</strong> ${(planetData.speed * 100).toFixed(3)}</p>
+                    <p><strong><span data-term="自转">自转</span>速度:</strong> ${(planetData.rotationSpeed * 100).toFixed(3)}</p>
                     ${relativeSpeed !== null ? `<p><strong>相对速度:</strong> ${relativeSpeed.toFixed(2)} 单位/帧</p>` : ''}
                 </div>
                 ${distanceToNearest ? `
@@ -593,6 +685,15 @@ class UIController {
                 ${info ? `<div class="info-section"><p>${info}</p></div>` : ''}
             `;
             infoPanel.style.display = 'block';
+            
+            // 添加术语提示
+            if (this.terminologyManager) {
+                const termElements = infoPanel.querySelectorAll('[data-term]');
+                termElements.forEach(el => {
+                    const term = el.getAttribute('data-term');
+                    this.terminologyManager.addTerminology(el, term);
+                });
+            }
             
             // 定期更新信息（每秒更新一次）
             if (this.infoUpdateInterval) {
@@ -999,6 +1100,7 @@ class UIController {
             <div class="charts-tabs">
                 <button class="chart-tab active" data-chart="distance">距离图表</button>
                 <button class="chart-tab" data-chart="velocity">速度图表</button>
+                <button class="chart-tab" data-chart="period">轨道周期对比</button>
             </div>
             <div class="charts-content">
                 <div class="chart-container">
@@ -1006,6 +1108,9 @@ class UIController {
                 </div>
                 <div class="chart-container" style="display: none;">
                     <canvas id="velocity-chart" width="600" height="300"></canvas>
+                </div>
+                <div class="chart-container" style="display: none;">
+                    <canvas id="period-chart" width="600" height="300"></canvas>
                 </div>
                 <div class="chart-legend" id="chart-legend"></div>
             </div>
@@ -1025,8 +1130,9 @@ class UIController {
                 tab.classList.add('active');
                 
                 const chartType = tab.getAttribute('data-chart');
+                const chartIndex = chartType === 'distance' ? 0 : (chartType === 'velocity' ? 1 : 2);
                 document.querySelectorAll('.chart-container').forEach((container, index) => {
-                    container.style.display = (index === (chartType === 'distance' ? 0 : 1)) ? 'block' : 'none';
+                    container.style.display = (index === chartIndex) ? 'block' : 'none';
                 });
                 
                 this.updateCharts();
@@ -1167,6 +1273,8 @@ class UIController {
             this.drawDistanceChart();
         } else if (chartType === 'velocity') {
             this.drawVelocityChart();
+        } else if (chartType === 'period') {
+            this.drawPeriodChart();
         }
     }
     
@@ -1410,6 +1518,519 @@ class UIController {
         });
         
         legend.innerHTML = html;
+    }
+    
+    // 绘制轨道周期对比图表
+    drawPeriodChart() {
+        const canvas = document.getElementById('period-chart');
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        
+        // 清空画布
+        ctx.clearRect(0, 0, width, height);
+        
+        // 设置样式
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, width, height);
+        
+        // 绘制网格
+        ctx.strokeStyle = 'rgba(79, 195, 247, 0.2)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 10; i++) {
+            const y = (height / 10) * i;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+            ctx.stroke();
+        }
+        
+        // 获取所有行星的轨道周期数据
+        const planetPeriods = [];
+        Config.planetData.forEach(planet => {
+            const detailedData = Config.planetDetailedData[planet.name];
+            if (detailedData && detailedData.orbitalPeriod) {
+                // 解析周期字符串，转换为天数
+                let days = 0;
+                const periodStr = detailedData.orbitalPeriod;
+                if (periodStr.includes('地球日')) {
+                    days = parseFloat(periodStr);
+                } else if (periodStr.includes('地球年')) {
+                    days = parseFloat(periodStr) * 365.25;
+                }
+                
+                if (days > 0) {
+                    planetPeriods.push({
+                        name: planet.name,
+                        days: days,
+                        years: days / 365.25
+                    });
+                }
+            }
+        });
+        
+        if (planetPeriods.length === 0) {
+            ctx.fillStyle = '#4fc3f7';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('暂无数据', width / 2, height / 2);
+            return;
+        }
+        
+        // 按周期排序
+        planetPeriods.sort((a, b) => a.days - b.days);
+        
+        const padding = 60;
+        const chartWidth = width - padding * 2;
+        const chartHeight = height - padding * 2;
+        const barWidth = chartWidth / planetPeriods.length * 0.8;
+        const barSpacing = chartWidth / planetPeriods.length * 0.2;
+        const maxPeriod = Math.max(...planetPeriods.map(p => p.days));
+        
+        // 绘制坐标轴
+        ctx.strokeStyle = '#4fc3f7';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding, padding);
+        ctx.lineTo(padding, height - padding);
+        ctx.lineTo(width - padding, height - padding);
+        ctx.stroke();
+        
+        // 绘制标签
+        ctx.fillStyle = '#4fc3f7';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('行星', width / 2, height - 10);
+        ctx.save();
+        ctx.translate(15, height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('轨道周期 (地球日)', 0, 0);
+        ctx.restore();
+        
+        // 绘制Y轴刻度
+        ctx.fillStyle = '#4fc3f7';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'right';
+        for (let i = 0; i <= 5; i++) {
+            const value = (maxPeriod / 5) * i;
+            const y = height - padding - (i / 5) * chartHeight;
+            ctx.fillText(value.toFixed(0), padding - 5, y + 4);
+        }
+        
+        // 绘制柱状图
+        const colors = ['#4fc3f7', '#ff6b6b', '#51cf66', '#ffd43b', '#ff922b', '#845ef7', '#339af0', '#20c997'];
+        
+        planetPeriods.forEach((planet, index) => {
+            const barHeight = (planet.days / maxPeriod) * chartHeight;
+            const x = padding + index * (barWidth + barSpacing) + barSpacing / 2;
+            const y = height - padding - barHeight;
+            
+            const color = colors[index % colors.length];
+            
+            // 绘制柱子
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, barWidth, barHeight);
+            
+            // 绘制边框
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, barWidth, barHeight);
+            
+            // 绘制数值标签
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            const labelY = y - 5;
+            if (labelY > padding) {
+                ctx.fillText(planet.days.toFixed(0) + '天', x + barWidth / 2, labelY);
+            } else {
+                // 如果标签在柱子内部，显示在柱子顶部
+                ctx.fillStyle = '#000';
+                ctx.fillText(planet.days.toFixed(0) + '天', x + barWidth / 2, y + 12);
+            }
+            
+            // 绘制行星名称
+            ctx.fillStyle = '#4fc3f7';
+            ctx.font = '11px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(planet.name, x + barWidth / 2, height - padding + 20);
+        });
+        
+        // 更新图例
+        this.updatePeriodChartLegend(planetPeriods);
+    }
+    
+    // 更新轨道周期图例
+    updatePeriodChartLegend(planetPeriods) {
+        const legend = document.getElementById('chart-legend');
+        if (!legend) return;
+        
+        const colors = ['#4fc3f7', '#ff6b6b', '#51cf66', '#ffd43b', '#ff922b', '#845ef7', '#339af0', '#20c997'];
+        
+        let html = '<div class="legend-title">轨道周期:</div>';
+        
+        planetPeriods.forEach((planet, index) => {
+            const color = colors[index % colors.length];
+            const periodText = planet.years < 1 
+                ? `${planet.days.toFixed(0)} 地球日`
+                : `${planet.years.toFixed(2)} 地球年 (${planet.days.toFixed(0)} 天)`;
+            
+            html += `
+                <div class="legend-item">
+                    <span class="legend-color" style="background: ${color}"></span>
+                    <span class="legend-label">${planet.name}: ${periodText}</span>
+                </div>
+            `;
+        });
+        
+        legend.innerHTML = html;
+    }
+    
+    // 创建统计面板
+    createStatisticsPanel() {
+        const panel = document.createElement('div');
+        panel.id = 'statistics-panel';
+        panel.className = 'statistics-panel';
+        panel.innerHTML = `
+            <div class="stats-header">
+                <h3>系统统计</h3>
+                <button id="close-stats-btn">×</button>
+            </div>
+            <div class="stats-content">
+                <div class="stat-item">
+                    <span class="stat-label">总运行时间:</span>
+                    <span class="stat-value" id="stat-runtime">0 秒</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">已触发事件数:</span>
+                    <span class="stat-value" id="stat-events">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">观察到的彗星数:</span>
+                    <span class="stat-value" id="stat-comets">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">模拟时间:</span>
+                    <span class="stat-value" id="stat-simtime">0 天</span>
+                </div>
+                <div class="stat-section">
+                    <h4>行星公转圈数</h4>
+                    <div id="stat-revolutions" class="revolutions-list"></div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(panel);
+        
+        // 绑定关闭按钮
+        const closeBtn = document.getElementById('close-stats-btn');
+        closeBtn.addEventListener('click', () => {
+            this.toggleStatisticsPanel();
+        });
+        
+        // 初始化统计数据
+        this.initStatistics();
+    }
+    
+    // 初始化统计数据
+    initStatistics() {
+        // 初始化行星公转圈数
+        Config.planetData.forEach(planet => {
+            this.statistics.planetRevolutions[planet.name] = 0;
+        });
+        
+        // 监听事件管理器的事件
+        if (this.eventManager) {
+            // 监听事件触发
+            const originalTriggerEvent = this.eventManager.triggerEvent.bind(this.eventManager);
+            this.eventManager.triggerEvent = (type, data, key) => {
+                originalTriggerEvent(type, data, key);
+                this.statistics.totalEvents++;
+                this.updateStatistics();
+            };
+        }
+    }
+    
+    // 切换统计面板显示
+    toggleStatisticsPanel() {
+        const panel = document.getElementById('statistics-panel');
+        if (panel) {
+            const isCurrentlyVisible = panel.style.display !== 'none' && panel.style.display !== '';
+            panel.style.display = isCurrentlyVisible ? 'none' : 'block';
+            
+            if (!isCurrentlyVisible) {
+                // 显示面板，开始更新统计
+                this.updateStatistics();
+                this.statisticsUpdateInterval = setInterval(() => {
+                    this.updateStatistics();
+                }, 1000); // 每秒更新一次
+            } else {
+                // 隐藏面板，停止更新
+                if (this.statisticsUpdateInterval) {
+                    clearInterval(this.statisticsUpdateInterval);
+                    this.statisticsUpdateInterval = null;
+                }
+            }
+        }
+    }
+    
+    // 更新统计数据
+    updateStatistics() {
+        const panel = document.getElementById('statistics-panel');
+        if (!panel || panel.style.display === 'none') return;
+        
+        // 更新运行时间
+        const runtimeEl = document.getElementById('stat-runtime');
+        if (runtimeEl) {
+            const runtime = Math.floor((Date.now() - this.statistics.startTime) / 1000);
+            const hours = Math.floor(runtime / 3600);
+            const minutes = Math.floor((runtime % 3600) / 60);
+            const seconds = runtime % 60;
+            if (hours > 0) {
+                runtimeEl.textContent = `${hours}小时 ${minutes}分钟 ${seconds}秒`;
+            } else if (minutes > 0) {
+                runtimeEl.textContent = `${minutes}分钟 ${seconds}秒`;
+            } else {
+                runtimeEl.textContent = `${seconds} 秒`;
+            }
+        }
+        
+        // 更新事件数
+        const eventsEl = document.getElementById('stat-events');
+        if (eventsEl) {
+            eventsEl.textContent = this.statistics.totalEvents.toString();
+        }
+        
+        // 更新彗星数（从EventManager获取）
+        const cometsEl = document.getElementById('stat-comets');
+        if (cometsEl && this.eventManager) {
+            // 尝试从EventManager获取彗星数量
+            const cometCount = this.eventManager.eventHistory ? 
+                this.eventManager.eventHistory.filter(e => e.type === 'comet_approach').length : 0;
+            this.statistics.cometCount = cometCount;
+            cometsEl.textContent = this.statistics.cometCount.toString();
+        }
+        
+        // 更新模拟时间
+        const simtimeEl = document.getElementById('stat-simtime');
+        if (simtimeEl) {
+            const days = Math.floor(this.simulationTime);
+            const years = (days / 365.25).toFixed(2);
+            simtimeEl.textContent = `${days} 天 (${years} 年)`;
+        }
+        
+        // 更新行星公转圈数
+        this.updatePlanetRevolutions();
+    }
+    
+    // 更新行星公转圈数
+    updatePlanetRevolutions() {
+        const revolutionsEl = document.getElementById('stat-revolutions');
+        if (!revolutionsEl || !this.planetManager) return;
+        
+        let html = '';
+        
+        Config.planetData.forEach(planet => {
+            const planetGroup = this.planetManager.planets.find(p => {
+                const planetMesh = p.children[0];
+                return planetMesh && planetMesh.userData && planetMesh.userData.name === planet.name;
+            });
+            
+            if (planetGroup) {
+                const planetMesh = planetGroup.children[0];
+                if (planetMesh && planetMesh.userData) {
+                    const angle = planetMesh.userData.angle || 0;
+                    // 计算公转圈数：angle / (2 * PI)
+                    const revolutions = Math.floor(angle / (Math.PI * 2));
+                    
+                    // 更新统计数据
+                    if (revolutions > this.statistics.planetRevolutions[planet.name]) {
+                        this.statistics.planetRevolutions[planet.name] = revolutions;
+                    }
+                    
+                    const currentRevolutions = this.statistics.planetRevolutions[planet.name];
+                    const detailedData = Config.planetDetailedData[planet.name];
+                    const orbitalPeriod = detailedData ? detailedData.orbitalPeriod : '';
+                    
+                    html += `
+                        <div class="revolution-item">
+                            <span class="revolution-planet">${planet.name}:</span>
+                            <span class="revolution-count">${currentRevolutions} 圈</span>
+                            <span class="revolution-period">(${orbitalPeriod})</span>
+                        </div>
+                    `;
+                }
+            }
+        });
+        
+        revolutionsEl.innerHTML = html || '<div class="no-data">暂无数据</div>';
+    }
+
+    // 截图功能
+    takeScreenshot() {
+        if (!this.renderer) {
+            console.error('Renderer not available');
+            return;
+        }
+
+        try {
+            // 使用renderer的domElement来截图
+            const dataURL = this.renderer.domElement.toDataURL('image/png');
+            
+            // 创建下载链接
+            const link = document.createElement('a');
+            link.download = `solar-system-${Date.now()}.png`;
+            link.href = dataURL;
+            
+            // 触发下载
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // 显示成功提示
+            this.showScreenshotNotification();
+        } catch (error) {
+            console.error('Screenshot failed:', error);
+            alert('截图失败，请重试');
+        }
+    }
+
+    // 显示截图成功通知
+    showScreenshotNotification() {
+        const notification = document.createElement('div');
+        notification.className = 'screenshot-notification';
+        notification.textContent = '✓ 截图已保存';
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 200, 0, 0.9);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            z-index: 10000;
+            font-size: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease-out;
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.animation = 'slideOut 0.3s ease-out';
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 300);
+        }, 2000);
+    }
+
+    // 切换探测器信息面板
+    toggleMissionsPanel() {
+        let panel = document.getElementById('missions-panel');
+        
+        if (!panel) {
+            // 创建面板
+            panel = document.createElement('div');
+            panel.id = 'missions-panel';
+            panel.className = 'info-panel';
+            panel.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 80%;
+                max-width: 800px;
+                max-height: 80vh;
+                background: rgba(20, 20, 30, 0.95);
+                border: 2px solid #4fc3f7;
+                border-radius: 12px;
+                padding: 20px;
+                z-index: 1000;
+                overflow-y: auto;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            `;
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '×';
+            closeBtn.id = 'close-missions-btn';
+            closeBtn.style.cssText = `
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                background: #ff6b6b;
+                color: white;
+                border: none;
+                border-radius: 50%;
+                width: 30px;
+                height: 30px;
+                cursor: pointer;
+                font-size: 20px;
+                line-height: 1;
+            `;
+            closeBtn.addEventListener('click', () => {
+                this.toggleMissionsPanel();
+            });
+            panel.appendChild(closeBtn);
+            
+            const title = document.createElement('h2');
+            title.textContent = '太空探测器信息';
+            title.style.cssText = 'color: #4fc3f7; margin-top: 0; margin-bottom: 20px;';
+            panel.appendChild(title);
+            
+            const missionsContainer = document.createElement('div');
+            missionsContainer.id = 'missions-container';
+            panel.appendChild(missionsContainer);
+            
+            document.body.appendChild(panel);
+        }
+        
+        const isVisible = panel.style.display !== 'none' && panel.style.display !== '';
+        panel.style.display = isVisible ? 'none' : 'block';
+        
+        if (!isVisible && this.missionManager) {
+            this.updateMissionsPanel();
+        }
+    }
+    
+    // 更新探测器信息面板
+    updateMissionsPanel() {
+        const container = document.getElementById('missions-container');
+        if (!container || !this.missionManager) return;
+        
+        container.innerHTML = '';
+        
+        this.missionManager.missions.forEach(missionGroup => {
+            const missionInfo = this.missionManager.getMissionInfo(missionGroup);
+            const missionData = missionGroup.userData.missionData;
+            
+            const missionCard = document.createElement('div');
+            missionCard.style.cssText = `
+                background: rgba(40, 40, 60, 0.8);
+                border: 1px solid rgba(79, 195, 247, 0.3);
+                border-radius: 8px;
+                padding: 15px;
+                margin-bottom: 15px;
+            `;
+            
+            const name = document.createElement('h3');
+            name.textContent = missionInfo.name;
+            name.style.cssText = `color: rgb(${this.missionManager.hexToRgb(missionData.color).r}, ${this.missionManager.hexToRgb(missionData.color).g}, ${this.missionManager.hexToRgb(missionData.color).b}); margin-top: 0;`;
+            missionCard.appendChild(name);
+            
+            const info = document.createElement('div');
+            info.style.cssText = 'color: #ccc; line-height: 1.8;';
+            info.innerHTML = `
+                <p><strong>发射日期:</strong> ${missionInfo.launchDate}</p>
+                <p><strong>目标:</strong> ${missionInfo.target}</p>
+                <p><strong>状态:</strong> <span style="color: ${missionInfo.status === '运行中' ? '#4fc3f7' : missionInfo.status === '已完成' ? '#51cf66' : '#ff6b6b'}">${missionInfo.status}</span></p>
+                <p><strong>任务类型:</strong> ${missionData.trajectory.type === 'orbit' ? '轨道器' : missionData.trajectory.type === 'lander' ? '着陆器' : '飞越探测器'}</p>
+                <p><strong>描述:</strong> ${missionInfo.description}</p>
+            `;
+            missionCard.appendChild(info);
+            
+            container.appendChild(missionCard);
+        });
     }
 }
 

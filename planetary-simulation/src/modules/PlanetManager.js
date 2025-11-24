@@ -232,36 +232,106 @@ class PlanetManager {
         const { innerRadius, outerRadius, count } = Config.asteroidBelt;
         
         for (let i = 0; i < count; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const radius = innerRadius + Math.random() * (outerRadius - innerRadius);
-            const height = (Math.random() - 0.5) * 20;
+            // 轨道参数（真实小行星带特征）
+            // 半长轴：在内外半径之间，但使用更真实的分布
+            const semiMajorAxis = innerRadius + Math.random() * (outerRadius - innerRadius);
             
-            const size = Math.random() * 0.3 + 0.1;
-            // 使用更简单的几何体以提升性能（从Dodecahedron改为BoxGeometry）
-            const geometry = new THREE.BoxGeometry(size, size, size);
+            // 偏心率：小行星带偏心率较小，通常在0-0.3之间
+            const eccentricity = Math.random() * 0.25;
+            
+            // 轨道倾角：小行星带倾角通常在0-20度之间
+            const inclination = (Math.random() - 0.5) * 0.35; // 约-10到10度
+            
+            // 升交点经度（轨道平面旋转）
+            const longitudeOfAscendingNode = Math.random() * Math.PI * 2;
+            
+            // 近点角（perihelion argument）
+            const argumentOfPeriapsis = Math.random() * Math.PI * 2;
+            
+            // 初始真近点角（在轨道上的位置）
+            const trueAnomaly = Math.random() * Math.PI * 2;
+            
+            // 轨道速度（根据开普勒第三定律，距离越远速度越慢）
+            const baseSpeed = 0.0015; // 基础速度
+            const speed = baseSpeed * Math.sqrt(innerRadius / semiMajorAxis) * (0.8 + Math.random() * 0.4);
+            
+            // 小行星大小（更真实的分布）
+            const size = 0.08 + Math.random() * 0.25;
+            
+            // 创建不规则的小行星几何体（使用八面体或随机形状）
+            let geometry;
+            const shapeType = Math.random();
+            if (shapeType < 0.4) {
+                // 40%使用八面体
+                geometry = new THREE.OctahedronGeometry(size, 0);
+            } else if (shapeType < 0.7) {
+                // 30%使用十二面体
+                geometry = new THREE.DodecahedronGeometry(size, 0);
+            } else {
+                // 30%使用不规则盒子（性能更好）
+                const w = size * (0.7 + Math.random() * 0.6);
+                const h = size * (0.7 + Math.random() * 0.6);
+                const d = size * (0.7 + Math.random() * 0.6);
+                geometry = new THREE.BoxGeometry(w, h, d);
+            }
+            
+            // 改进材质（更真实的颜色和质感）
+            const colorVariation = 0.3 + Math.random() * 0.4; // 0.3-0.7的灰度变化
             const material = new THREE.MeshStandardMaterial({
-                color: 0x666666,
-                roughness: 0.9
+                color: new THREE.Color(colorVariation, colorVariation * 0.9, colorVariation * 0.8),
+                roughness: 0.85 + Math.random() * 0.15,
+                metalness: 0.05 + Math.random() * 0.1
             });
             
             const asteroid = new THREE.Mesh(geometry, material);
-            asteroid.position.set(
-                Math.cos(angle) * radius,
-                height,
-                Math.sin(angle) * radius
-            );
+            asteroid.castShadow = true;
+            asteroid.receiveShadow = true;
+            
+            // 初始旋转
             asteroid.rotation.set(
-                Math.random() * Math.PI,
-                Math.random() * Math.PI,
-                Math.random() * Math.PI
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2
             );
             
+            // 计算初始位置（使用椭圆轨道方程）
+            const r = semiMajorAxis * (1 - eccentricity * eccentricity) / 
+                     (1 + eccentricity * Math.cos(trueAnomaly));
+            
+            // 应用轨道倾角和升交点经度
+            const cosInclination = Math.cos(inclination);
+            const sinInclination = Math.sin(inclination);
+            const cosNode = Math.cos(longitudeOfAscendingNode);
+            const sinNode = Math.sin(longitudeOfAscendingNode);
+            const cosAnomaly = Math.cos(trueAnomaly + argumentOfPeriapsis);
+            const sinAnomaly = Math.sin(trueAnomaly + argumentOfPeriapsis);
+            
+            // 轨道平面内的位置
+            const xOrbital = r * cosAnomaly;
+            const yOrbital = r * sinAnomaly;
+            
+            // 转换到3D空间（应用倾角和升交点）
+            const x = xOrbital * cosNode - yOrbital * sinNode * cosInclination;
+            const y = yOrbital * sinInclination;
+            const z = xOrbital * sinNode + yOrbital * cosNode * cosInclination;
+            
+            asteroid.position.set(x, y, z);
+            
+            // 存储轨道参数
             asteroid.userData = {
                 isAsteroid: true,
-                angle: angle,
-                radius: radius,
-                rotationSpeed: (Math.random() - 0.5) * 0.02,
-                orbitSpeed: 0.001 + Math.random() * 0.001
+                semiMajorAxis: semiMajorAxis,
+                eccentricity: eccentricity,
+                inclination: inclination,
+                longitudeOfAscendingNode: longitudeOfAscendingNode,
+                argumentOfPeriapsis: argumentOfPeriapsis,
+                trueAnomaly: trueAnomaly,
+                speed: speed,
+                rotationSpeed: {
+                    x: (Math.random() - 0.5) * 0.03,
+                    y: (Math.random() - 0.5) * 0.03,
+                    z: (Math.random() - 0.5) * 0.03
+                }
             };
             
             this.asteroidBelt.push(asteroid);
@@ -399,6 +469,76 @@ class PlanetManager {
         const atmosphere = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
         planet.add(atmosphere);
         atmosphere.userData.isAtmosphere = true;
+        
+        // 为地球添加极光效果
+        if (data.name === '地球') {
+            this.createAurora(planet, data);
+        }
+    }
+    
+    // 创建极光效果
+    createAurora(planet, data) {
+        const auroraGroup = new THREE.Group();
+        const planetSize = data.size;
+        
+        // 创建多个极光带（在南北两极）
+        const auroraCount = 8; // 每个极4条
+        const colors = [
+            0x00ff88, // 绿色
+            0x00ffff, // 青色
+            0x0088ff, // 蓝色
+            0xff00ff  // 紫色
+        ];
+        
+        // 北极极光
+        for (let i = 0; i < auroraCount / 2; i++) {
+            const aurora = this.createAuroraBand(planetSize, colors[i % colors.length], true);
+            aurora.position.y = planetSize * 0.8; // 靠近北极
+            aurora.rotation.z = (i / (auroraCount / 2)) * Math.PI * 2;
+            auroraGroup.add(aurora);
+        }
+        
+        // 南极极光
+        for (let i = 0; i < auroraCount / 2; i++) {
+            const aurora = this.createAuroraBand(planetSize, colors[i % colors.length], false);
+            aurora.position.y = -planetSize * 0.8; // 靠近南极
+            aurora.rotation.z = (i / (auroraCount / 2)) * Math.PI * 2;
+            auroraGroup.add(aurora);
+        }
+        
+        auroraGroup.userData.isAurora = true;
+        planet.add(auroraGroup);
+        planet.userData.auroraGroup = auroraGroup;
+    }
+    
+    // 创建单个极光带
+    createAuroraBand(planetSize, color, isNorth) {
+        const auroraGroup = new THREE.Group();
+        
+        // 创建多个发光的平面来模拟极光带
+        const bandCount = 5;
+        const bandWidth = planetSize * 0.3;
+        const bandHeight = planetSize * 0.4;
+        
+        for (let i = 0; i < bandCount; i++) {
+            const geometry = new THREE.PlaneGeometry(bandWidth, bandHeight);
+            const material = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.3 - (i * 0.05),
+                side: THREE.DoubleSide,
+                blending: THREE.AdditiveBlending
+            });
+            
+            const band = new THREE.Mesh(geometry, material);
+            band.position.x = (i - bandCount / 2) * (bandWidth / bandCount);
+            band.rotation.x = isNorth ? -Math.PI / 2 : Math.PI / 2;
+            band.userData.offset = i;
+            band.userData.isNorth = isNorth;
+            auroraGroup.add(band);
+        }
+        
+        return auroraGroup;
     }
 
     updatePlanets(delta) {
@@ -458,6 +598,11 @@ class PlanetManager {
             // 自转
             planet.rotation.y += data.rotationSpeed * delta;
             
+            // 更新极光效果（仅地球）
+            if (data.name === '地球' && planet.userData.auroraGroup) {
+                this.updateAurora(planet.userData.auroraGroup, delta);
+            }
+            
             // 更新所有卫星（月亮）
             for (let i = 0; i < planet.children.length; i++) {
                 const child = planet.children[i];
@@ -472,17 +617,57 @@ class PlanetManager {
             }
         });
         
-        // 更新小行星带（优化：减少旋转更新频率）
+        // 更新小行星带（使用真实椭圆轨道）
         this.asteroidBelt.forEach((asteroid, index) => {
-            asteroid.userData.angle += asteroid.userData.orbitSpeed * delta;
-            const radius = asteroid.userData.radius;
-            asteroid.position.x = Math.cos(asteroid.userData.angle) * radius;
-            asteroid.position.z = Math.sin(asteroid.userData.angle) * radius;
-            // 每帧只更新一半小行星的旋转，交替更新以提升性能
-            if (index % 2 === 0 || Math.random() > 0.5) {
-                asteroid.rotation.x += asteroid.userData.rotationSpeed * delta;
-                asteroid.rotation.y += asteroid.userData.rotationSpeed * delta;
+            const data = asteroid.userData;
+            
+            // 更新真近点角
+            data.trueAnomaly += data.speed * delta;
+            
+            // 使用开普勒轨道方程计算当前位置
+            const r = data.semiMajorAxis * (1 - data.eccentricity * data.eccentricity) / 
+                     (1 + data.eccentricity * Math.cos(data.trueAnomaly));
+            
+            // 应用轨道倾角和升交点经度
+            const cosInclination = Math.cos(data.inclination);
+            const sinInclination = Math.sin(data.inclination);
+            const cosNode = Math.cos(data.longitudeOfAscendingNode);
+            const sinNode = Math.sin(data.longitudeOfAscendingNode);
+            const cosAnomaly = Math.cos(data.trueAnomaly + data.argumentOfPeriapsis);
+            const sinAnomaly = Math.sin(data.trueAnomaly + data.argumentOfPeriapsis);
+            
+            // 轨道平面内的位置
+            const xOrbital = r * cosAnomaly;
+            const yOrbital = r * sinAnomaly;
+            
+            // 转换到3D空间（应用倾角和升交点）
+            asteroid.position.x = xOrbital * cosNode - yOrbital * sinNode * cosInclination;
+            asteroid.position.y = yOrbital * sinInclination;
+            asteroid.position.z = xOrbital * sinNode + yOrbital * cosNode * cosInclination;
+            
+            // 自转（优化：每帧只更新一部分小行星的旋转）
+            if (index % 3 === 0) {
+                asteroid.rotation.x += data.rotationSpeed.x * delta;
+                asteroid.rotation.y += data.rotationSpeed.y * delta;
+                asteroid.rotation.z += data.rotationSpeed.z * delta;
             }
+        });
+    }
+
+    // 更新极光动画
+    updateAurora(auroraGroup, delta) {
+        const time = Date.now() * 0.001;
+        
+        auroraGroup.children.forEach((bandGroup, index) => {
+            bandGroup.children.forEach((band, bandIndex) => {
+                // 动态改变透明度和位置
+                const wave = Math.sin(time * 0.5 + bandIndex * 0.3 + index * 0.5) * 0.5 + 0.5;
+                band.material.opacity = (0.2 + wave * 0.3) * (1 - bandIndex * 0.1);
+                
+                // 轻微摆动
+                band.rotation.z = Math.sin(time * 0.3 + bandIndex * 0.2) * 0.1;
+                band.position.y = Math.sin(time * 0.4 + bandIndex * 0.3) * 0.1;
+            });
         });
     }
 

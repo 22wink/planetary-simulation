@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>太阳系3D展示</title>
+    <link rel="stylesheet" href="./src/styles/index.css">
+    <script src="/public/three.min.js"></script>
+    <script src="/public/OrbitControls.js"></script>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div class="info">
+        <h1>太阳系模拟</h1>
+        <p>使用鼠标拖动旋转视角 | 滚轮缩放 | 点击行星查看信息</p>
+    </div>
+    <div id="planet-info" class="planet-info"></div>
+    <!-- 模块化文件，按依赖顺序加载 -->
+    <script src="./src/config/index.js"></script>
+    <script src="./src/modules/SceneManager.js"></script>
+    <script src="./src/modules/PlanetManager.js"></script>
+    <script src="./src/modules/CameraController.js"></script>
+    <script src="./src/modules/AnimationController.js"></script>
+    <script src="./src/modules/MeteorManager.js"></script>
+    <script src="./src/modules/CometManager.js"></script>
+    <script src="./src/modules/EventManager.js"></script>
+    <script src="./src/modules/VisualizationManager.js"></script>
+    <script src="./src/modules/TerminologyManager.js"></script>
+    <script src="./src/modules/MissionManager.js"></script>
+    <script src="./src/modules/AsteroidManager.js"></script>
+    <script src="./src/modules/UIController.js"></script>
+    <script src="./src/main.js"></script>
+</body>
+</html>
+

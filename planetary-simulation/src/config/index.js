@@ -360,6 +360,46 @@ const Config = {
             checkFrequency: 0.01,  // 检测频率（较低，因为流星雨是周期性事件）
             duration: 30000,  // 流星雨持续时间（毫秒）
             intensity: 3  // 流星雨强度倍数（正常流星的倍数）
+        },
+        // 行星凌日事件配置
+        planetTransit: {
+            enabled: true,
+            showHighlight: true,
+            showNotification: true,
+            checkFrequency: 0.15,  // 检测频率
+            alignmentThreshold: 0.1,  // 对齐阈值（弧度）
+            planets: ['水星', '金星']  // 可以发生凌日的行星
+        },
+        // 行星逆行事件配置
+        retrograde: {
+            enabled: true,
+            showHighlight: true,
+            showNotification: true,
+            checkFrequency: 0.2,  // 检测频率
+            planets: ['火星', '木星', '土星', '天王星', '海王星']  // 可以发生逆行的外行星
+        },
+        // 大合相事件配置（3颗以上行星对齐）
+        grandConjunction: {
+            enabled: true,
+            showHighlight: true,
+            showNotification: true,
+            checkFrequency: 0.05,  // 检测频率（较低，因为大合相很罕见）
+            minPlanets: 3,  // 最少需要3颗行星
+            threshold: 60,  // 对齐阈值（距离）
+            angleThreshold: 0.2  // 角度阈值（弧度）
+        },
+        // 小行星接近事件配置
+        asteroidApproach: {
+            enabled: true,
+            showHighlight: true,
+            showNotification: true,
+            checkFrequency: 0.02,  // 检测频率
+            spawnInterval: 30000,  // 生成间隔（毫秒）
+            minDistance: 80,  // 最小接近距离（场景单位）
+            maxDistance: 200,  // 最大接近距离
+            safeDistance: 150,  // 安全距离（绿色）
+            warningDistance: 120,  // 警告距离（黄色）
+            dangerDistance: 100  // 危险距离（红色）
         }
     },
 
@@ -470,6 +510,126 @@ const Config = {
             type: 'conjunction',
             description: '木星和土星近800年来最接近的一次大合相',
             color: '#ffd700'
+        }
+    ],
+
+    // 太空探测器数据
+    spaceMissions: [
+        {
+            name: '旅行者1号',
+            launchDate: { year: 1977, month: 9, day: 5 },
+            target: '外太阳系',
+            status: 'active',  // active, completed, lost
+            color: 0x4fc3f7,
+            size: 0.3,
+            description: '1977年发射，已飞出太阳系，是距离地球最远的人造物体',
+            trajectory: {
+                type: 'flyby',  // flyby, orbit, lander
+                targets: ['木星', '土星'],
+                currentDistance: 800,  // 当前距离太阳的距离（场景单位）
+                speed: 0.00005,
+                angle: 0
+            }
+        },
+        {
+            name: '旅行者2号',
+            launchDate: { year: 1977, month: 8, day: 20 },
+            target: '外太阳系',
+            status: 'active',
+            color: 0x4fc3f7,
+            size: 0.3,
+            description: '1977年发射，唯一访问过天王星和海王星的探测器',
+            trajectory: {
+                type: 'flyby',
+                targets: ['木星', '土星', '天王星', '海王星'],
+                currentDistance: 650,
+                speed: 0.00004,
+                angle: Math.PI / 4
+            }
+        },
+        {
+            name: '卡西尼号',
+            launchDate: { year: 1997, month: 10, day: 15 },
+            target: '土星',
+            status: 'completed',
+            color: 0xff6b6b,
+            size: 0.35,
+            description: '1997年发射，2004年进入土星轨道，2017年任务结束',
+            trajectory: {
+                type: 'orbit',
+                targets: ['土星'],
+                currentDistance: 350,
+                speed: 0.0008,
+                angle: Math.PI / 3,
+                orbitRadius: 20
+            }
+        },
+        {
+            name: '朱诺号',
+            launchDate: { year: 2011, month: 8, day: 5 },
+            target: '木星',
+            status: 'active',
+            color: 0xf39c12,
+            size: 0.3,
+            description: '2011年发射，2016年进入木星轨道，研究木星内部结构',
+            trajectory: {
+                type: 'orbit',
+                targets: ['木星'],
+                currentDistance: 250,
+                speed: 0.002,
+                angle: Math.PI / 2,
+                orbitRadius: 15
+            }
+        },
+        {
+            name: '新视野号',
+            launchDate: { year: 2006, month: 1, day: 19 },
+            target: '冥王星',
+            status: 'active',
+            color: 0x9b59b6,
+            size: 0.3,
+            description: '2006年发射，2015年飞越冥王星，传回高清图像',
+            trajectory: {
+                type: 'flyby',
+                targets: ['冥王星'],
+                currentDistance: 600,
+                speed: 0.00006,
+                angle: Math.PI / 6
+            }
+        },
+        {
+            name: '好奇号',
+            launchDate: { year: 2011, month: 11, day: 26 },
+            target: '火星',
+            status: 'active',
+            color: 0xe74c3c,
+            size: 0.25,
+            description: '2011年发射，2012年登陆火星，持续探索火星表面',
+            trajectory: {
+                type: 'lander',
+                targets: ['火星'],
+                currentDistance: 150,
+                speed: 0.008,
+                angle: 0,
+                orbitRadius: 2
+            }
+        },
+        {
+            name: '毅力号',
+            launchDate: { year: 2020, month: 7, day: 30 },
+            target: '火星',
+            status: 'active',
+            color: 0xe74c3c,
+            size: 0.25,
+            description: '2020年发射，2021年登陆火星，收集样本准备返回地球',
+            trajectory: {
+                type: 'lander',
+                targets: ['火星'],
+                currentDistance: 150,
+                speed: 0.008,
+                angle: Math.PI / 8,
+                orbitRadius: 2.5
+            }
         }
     ]
 };
