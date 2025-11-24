@@ -502,6 +502,39 @@ class PlanetManager {
         return null;
     }
 
+    // 获取月球的世界位置
+    getMoonWorldPosition(planetName, moonName) {
+        const planetGroup = this.getPlanetByName(planetName);
+        if (!planetGroup) return null;
+        
+        const planet = planetGroup.children[0];
+        // 查找月球
+        for (let i = 0; i < planet.children.length; i++) {
+            const child = planet.children[i];
+            if (child.userData && child.userData.isMoon && child.userData.name === moonName) {
+                const worldPosition = new THREE.Vector3();
+                child.getWorldPosition(worldPosition);
+                return worldPosition;
+            }
+        }
+        return null;
+    }
+
+    // 获取地球的月球对象
+    getEarthMoon() {
+        const earthGroup = this.getPlanetByName('地球');
+        if (!earthGroup) return null;
+        
+        const earth = earthGroup.children[0];
+        for (let i = 0; i < earth.children.length; i++) {
+            const child = earth.children[i];
+            if (child.userData && child.userData.isMoon && child.userData.name === '月球') {
+                return child;
+            }
+        }
+        return null;
+    }
+
     updateCME(delta) {
         if (!this.cmeParticles) return;
         

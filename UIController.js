@@ -11,6 +11,14 @@ class UIController {
         this.mouse = new THREE.Vector2();
         this.simulationTime = 0; // 模拟时间（天）
         this.lastUpdateTime = Date.now();
+        
+        // 图表数据存储
+        this.chartData = {
+            distances: {}, // { planetName: [{time, value}, ...] }
+            velocities: {}, // { planetName: [{time, value}, ...] }
+            maxDataPoints: 100 // 保留最近100个数据点
+        };
+        this.chartUpdateInterval = null;
     }
 
     init(renderer, camera) {
@@ -95,8 +103,13 @@ class UIController {
             <div class="control-group">
                 <h3>事件历史</h3>
                 <button id="show-events-btn">查看事件历史</button>
+                <button id="show-timeline-btn">历史事件时间线</button>
             </div>
             ` : ''}
+            <div class="control-group">
+                <h3>数据可视化</h3>
+                <button id="show-charts-btn">实时数据图表</button>
+            </div>
             ${this.visualizationManager ? `
             <div class="control-group">
                 <h3>可视化增强</h3>
@@ -138,7 +151,11 @@ class UIController {
         // 创建事件历史面板（隐藏）
         if (this.eventManager) {
             this.createEventHistoryPanel();
+            this.createHistoricalTimelinePanel();
         }
+        
+        // 创建数据图表面板
+        this.createDataChartsPanel();
     }
     
     toggleControlPanel() {
@@ -217,6 +234,22 @@ class UIController {
                     this.toggleEventHistory();
                 });
             }
+            
+            // 显示历史事件时间线按钮
+            const showTimelineBtn = document.getElementById('show-timeline-btn');
+            if (showTimelineBtn) {
+                showTimelineBtn.addEventListener('click', () => {
+                    this.toggleHistoricalTimeline();
+                });
+            }
+        }
+        
+        // 显示数据图表按钮
+        const showChartsBtn = document.getElementById('show-charts-btn');
+        if (showChartsBtn) {
+            showChartsBtn.addEventListener('click', () => {
+                this.toggleDataCharts();
+            });
         }
         
         // 时间跳跃滑块
@@ -473,6 +506,7 @@ class UIController {
         const infoPanel = document.getElementById('planet-info');
         if (infoPanel) {
             const info = Config.planetInfo[planetData.name] || '';
+            const detailedData = Config.planetDetailedData?.[planetData.name];
             
             // 计算到最近行星的距离
             const nearestPlanet = this.getNearestPlanet(planetData.name);
@@ -486,6 +520,45 @@ class UIController {
             
             // 更新模拟时间
             this.updateSimulationTime();
+            
+            // 构建详细信息HTML
+            let detailedInfoHTML = '';
+            if (detailedData) {
+                detailedInfoHTML = `
+                    <div class="info-section detailed-data">
+                        <h3>科学数据</h3>
+                        <p><strong>质量:</strong> ${detailedData.mass}</p>
+                        <p><strong>体积:</strong> ${detailedData.volume}</p>
+                        <p><strong>密度:</strong> ${detailedData.density}</p>
+                        <p><strong>表面温度:</strong> ${detailedData.surfaceTemp}</p>
+                        <p><strong>大气成分:</strong> ${detailedData.atmosphere}</p>
+                        <p><strong>公转周期:</strong> ${detailedData.orbitalPeriod}</p>
+                        <p><strong>自转周期:</strong> ${detailedData.rotationPeriod}</p>
+                        <p><strong>卫星数量:</strong> ${detailedData.moons}</p>
+                    </div>
+                    ${detailedData.facts && detailedData.facts.length > 0 ? `
+                    <div class="info-section facts">
+                        <h3>有趣事实</h3>
+                        <ul>
+                            ${detailedData.facts.map(fact => `<li>${fact}</li>`).join('')}
+                        </ul>
+                    </div>
+                    ` : ''}
+                    ${detailedData.missions && detailedData.missions.length > 0 ? `
+                    <div class="info-section missions">
+                        <h3>探索任务</h3>
+                        <div class="missions-list">
+                            ${detailedData.missions.map(mission => `
+                                <div class="mission-item">
+                                    <strong>${mission.name}</strong> (${mission.year})
+                                    <p class="mission-desc">${mission.description}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    ` : ''}
+                `;
+            }
             
             infoPanel.innerHTML = `
                 <h2>${planetData.name}</h2>
@@ -510,6 +583,7 @@ class UIController {
                     <p><strong>相位角度:</strong> ${phase.angle.toFixed(1)}°</p>
                 </div>
                 ` : ''}
+                ${detailedInfoHTML}
                 <div class="info-section">
                     <h3>模拟时间</h3>
                     <p><strong>模拟天数:</strong> ${this.simulationTime.toFixed(1)} 天</p>
@@ -778,6 +852,564 @@ class UIController {
             
             marksContainer.appendChild(mark);
         });
+    }
+
+    // 创建历史事件时间线面板
+    createHistoricalTimelinePanel() {
+        const panel = document.createElement('div');
+        panel.id = 'historical-timeline-panel';
+        panel.className = 'historical-timeline-panel';
+        panel.innerHTML = `
+            <div class="timeline-header">
+                <h3>历史事件时间线</h3>
+                <button id="close-timeline-btn">×</button>
+            </div>
+            <div class="timeline-content" id="timeline-content">
+                <p class="no-events">加载中...</p>
+            </div>
+        `;
+        document.body.appendChild(panel);
+        
+        // 关闭按钮
+        document.getElementById('close-timeline-btn').addEventListener('click', () => {
+            this.toggleHistoricalTimeline();
+        });
+    }
+
+    toggleHistoricalTimeline() {
+        const panel = document.getElementById('historical-timeline-panel');
+        if (!panel) return;
+        
+        if (panel.style.display === 'none' || !panel.style.display) {
+            panel.style.display = 'block';
+            this.updateHistoricalTimeline();
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
+    updateHistoricalTimeline() {
+        const content = document.getElementById('timeline-content');
+        if (!content) return;
+        
+        if (!Config.historicalEvents || Config.historicalEvents.length === 0) {
+            content.innerHTML = '<p class="no-events">暂无历史事件</p>';
+            return;
+        }
+        
+        // 按日期排序
+        const sortedEvents = Config.historicalEvents.slice().sort((a, b) => {
+            const dateA = new Date(a.date.year, a.date.month - 1, a.date.day);
+            const dateB = new Date(b.date.year, b.date.month - 1, b.date.day);
+            return dateA - dateB;
+        });
+        
+        content.innerHTML = sortedEvents.map(event => {
+            const dateStr = `${event.date.year}年${event.date.month}月${event.date.day}日`;
+            const typeNames = {
+                'comet': '彗星',
+                'mission': '太空任务',
+                'conjunction': '合相'
+            };
+            const typeName = typeNames[event.type] || '其他';
+            
+            return `
+                <div class="timeline-event" data-year="${event.date.year}" data-month="${event.date.month}" data-day="${event.date.day}">
+                    <div class="timeline-event-header">
+                        <span class="timeline-event-type" style="color: ${event.color}">${typeName}</span>
+                        <span class="timeline-event-date">${dateStr}</span>
+                    </div>
+                    <div class="timeline-event-name" style="color: ${event.color}">${event.name}</div>
+                    <div class="timeline-event-description">${event.description}</div>
+                    <button class="timeline-jump-btn" data-year="${event.date.year}" data-month="${event.date.month}" data-day="${event.date.day}">
+                        跳转到此时间
+                    </button>
+                </div>
+            `;
+        }).join('');
+        
+        // 绑定跳转按钮
+        content.querySelectorAll('.timeline-jump-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const year = parseInt(btn.getAttribute('data-year'));
+                const month = parseInt(btn.getAttribute('data-month'));
+                const day = parseInt(btn.getAttribute('data-day'));
+                this.jumpToHistoricalDate(year, month, day);
+            });
+        });
+    }
+
+    // 跳转到历史日期（简化实现：将日期转换为一年内的天数）
+    jumpToHistoricalDate(year, month, day) {
+        // 计算该日期在一年中的天数（简化：假设是当前年份）
+        const date = new Date(year, month - 1, day);
+        const startOfYear = new Date(year, 0, 1);
+        const days = Math.floor((date - startOfYear) / (1000 * 60 * 60 * 24));
+        
+        // 更新滑块
+        const timeJumpSlider = document.getElementById('time-jump-slider');
+        const timeJumpValue = document.getElementById('time-jump-value');
+        
+        if (timeJumpSlider && timeJumpValue) {
+            // 限制在0-365范围内
+            const clampedDays = Math.max(0, Math.min(365, days));
+            timeJumpSlider.value = clampedDays;
+            timeJumpValue.textContent = clampedDays + ' 天';
+            this.jumpToTime(clampedDays);
+        }
+        
+        // 显示通知（使用EventManager的通知系统）
+        if (this.eventManager) {
+            const event = Config.historicalEvents.find(e => 
+                e.date.year === year && e.date.month === month && e.date.day === day
+            );
+            if (event) {
+                // 创建一个临时通知元素
+                const notification = document.createElement('div');
+                notification.className = 'event-notification show';
+                notification.innerHTML = `
+                    <div class="notification-content">
+                        <h4>已跳转到历史事件</h4>
+                        <p><strong>${event.name}</strong><br>${event.description}</p>
+                    </div>
+                `;
+                document.body.appendChild(notification);
+                
+                // 3秒后移除
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => {
+                        document.body.removeChild(notification);
+                    }, 300);
+                }, 3000);
+            }
+        }
+    }
+    
+    // 创建数据图表面板
+    createDataChartsPanel() {
+        const panel = document.createElement('div');
+        panel.id = 'data-charts-panel';
+        panel.className = 'data-charts-panel';
+        panel.innerHTML = `
+            <div class="charts-header">
+                <h3>实时数据图表</h3>
+                <button id="close-charts-btn">×</button>
+            </div>
+            <div class="charts-tabs">
+                <button class="chart-tab active" data-chart="distance">距离图表</button>
+                <button class="chart-tab" data-chart="velocity">速度图表</button>
+            </div>
+            <div class="charts-content">
+                <div class="chart-container">
+                    <canvas id="distance-chart" width="600" height="300"></canvas>
+                </div>
+                <div class="chart-container" style="display: none;">
+                    <canvas id="velocity-chart" width="600" height="300"></canvas>
+                </div>
+                <div class="chart-legend" id="chart-legend"></div>
+            </div>
+        `;
+        document.body.appendChild(panel);
+        
+        // 绑定关闭按钮
+        const closeBtn = document.getElementById('close-charts-btn');
+        closeBtn.addEventListener('click', () => {
+            this.toggleDataCharts();
+        });
+        
+        // 绑定标签切换
+        document.querySelectorAll('.chart-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                const chartType = tab.getAttribute('data-chart');
+                document.querySelectorAll('.chart-container').forEach((container, index) => {
+                    container.style.display = (index === (chartType === 'distance' ? 0 : 1)) ? 'block' : 'none';
+                });
+                
+                this.updateCharts();
+            });
+        });
+    }
+    
+    // 切换数据图表显示
+    toggleDataCharts() {
+        const panel = document.getElementById('data-charts-panel');
+        if (panel) {
+            const isCurrentlyVisible = panel.style.display !== 'none' && panel.style.display !== '';
+            panel.style.display = isCurrentlyVisible ? 'none' : 'block';
+            
+            if (!isCurrentlyVisible) {
+                // 显示面板，开始更新图表
+                this.startChartUpdates();
+                this.updateCharts();
+            } else {
+                // 隐藏面板，停止更新图表
+                this.stopChartUpdates();
+            }
+        }
+    }
+    
+    // 开始图表数据更新
+    startChartUpdates() {
+        if (this.chartUpdateInterval) return;
+        
+        // 每0.5秒更新一次数据
+        this.chartUpdateInterval = setInterval(() => {
+            this.collectChartData();
+            this.updateCharts();
+        }, 500);
+        
+        // 立即收集一次数据
+        this.collectChartData();
+    }
+    
+    // 停止图表数据更新
+    stopChartUpdates() {
+        if (this.chartUpdateInterval) {
+            clearInterval(this.chartUpdateInterval);
+            this.chartUpdateInterval = null;
+        }
+    }
+    
+    // 收集图表数据
+    collectChartData() {
+        if (!this.planetManager || !this.planetManager.planets) return;
+        
+        const currentTime = this.simulationTime;
+        
+        this.planetManager.planets.forEach(planetGroup => {
+            // planetGroup 是 THREE.Group，实际的行星 Mesh 是 children[0]
+            const planet = planetGroup.children[0];
+            if (!planet || !planet.userData) return;
+            
+            const planetName = planet.userData.name;
+            if (!planetName) return;
+            
+            // 计算到太阳的距离
+            if (this.planetManager.sun) {
+                const planetWorldPos = this.planetManager.getPlanetWorldPosition(planetName);
+                if (planetWorldPos) {
+                    const sunWorldPos = new THREE.Vector3();
+                    this.planetManager.sun.getWorldPosition(sunWorldPos);
+                    const distance = planetWorldPos.distanceTo(sunWorldPos);
+                    
+                    // 使用场景单位（如果 Config.scale 不存在，直接使用距离值）
+                    // 地球距离约为100单位，对应1 AU，所以 scale 约为 100
+                    const scale = Config.scale || 100;
+                    const distanceAU = distance / scale;
+                    
+                    if (!this.chartData.distances[planetName]) {
+                        this.chartData.distances[planetName] = [];
+                    }
+                    this.chartData.distances[planetName].push({
+                        time: currentTime,
+                        value: distanceAU
+                    });
+                    
+                    // 限制数据点数量
+                    if (this.chartData.distances[planetName].length > this.chartData.maxDataPoints) {
+                        this.chartData.distances[planetName].shift();
+                    }
+                }
+            }
+            
+            // 计算轨道速度
+            // 速度 = 角速度 * 半径
+            // 从 userData 获取轨道参数
+            const orbitSpeed = planet.userData.speed || 0; // 角速度（弧度/时间单位）
+            const orbitDistance = planet.userData.distance || 0; // 轨道半径（场景单位）
+            
+            // 计算线速度：v = ω * r
+            // orbitSpeed 是每单位时间（timeScale）的角速度（弧度）
+            // 线速度 = 角速度 * 半径（场景单位/时间单位）
+            const linearSpeed = orbitSpeed * orbitDistance;
+            
+            // 转换为 km/s
+            // 简化处理：假设 100 场景单位 = 1 AU = 1.496×10^8 km
+            // 地球：distance=100, speed=0.01，linearSpeed = 1.0 场景单位/时间单位
+            // 地球实际轨道速度约 30 km/s
+            // 所以转换因子约为：30 km/s / 1.0 = 30
+            // 但需要考虑时间单位，这里简化处理
+            const scale = Config.scale || 100;
+            const kmPerAU = 1.496e8; // 1 AU = 1.496×10^8 km
+            // 假设 timeScale=1 对应每秒，则速度 = (linearSpeed / scale) * kmPerAU / 1000
+            // 但实际 timeScale 可能不是每秒，所以需要调整
+            // 简化：使用一个经验转换因子
+            const conversionFactor = 0.3; // 经验值，使地球速度约为 30 km/s
+            const speedKmS = linearSpeed * conversionFactor;
+            
+            if (!this.chartData.velocities[planetName]) {
+                this.chartData.velocities[planetName] = [];
+            }
+            this.chartData.velocities[planetName].push({
+                time: currentTime,
+                value: speedKmS
+            });
+            
+            // 限制数据点数量
+            if (this.chartData.velocities[planetName].length > this.chartData.maxDataPoints) {
+                this.chartData.velocities[planetName].shift();
+            }
+        });
+    }
+    
+    // 更新图表显示
+    updateCharts() {
+        const activeTab = document.querySelector('.chart-tab.active');
+        if (!activeTab) return;
+        
+        const chartType = activeTab.getAttribute('data-chart');
+        
+        if (chartType === 'distance') {
+            this.drawDistanceChart();
+        } else if (chartType === 'velocity') {
+            this.drawVelocityChart();
+        }
+    }
+    
+    // 绘制距离图表
+    drawDistanceChart() {
+        const canvas = document.getElementById('distance-chart');
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        
+        // 清空画布
+        ctx.clearRect(0, 0, width, height);
+        
+        // 设置样式
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, width, height);
+        
+        // 绘制网格
+        ctx.strokeStyle = 'rgba(79, 195, 247, 0.2)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 10; i++) {
+            const y = (height / 10) * i;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+            ctx.stroke();
+        }
+        
+        // 计算数据范围
+        let maxDistance = 0;
+        let minDistance = Infinity;
+        const allData = Object.values(this.chartData.distances);
+        
+        allData.forEach(dataArray => {
+            dataArray.forEach(point => {
+                maxDistance = Math.max(maxDistance, point.value);
+                minDistance = Math.min(minDistance, point.value);
+            });
+        });
+        
+        if (maxDistance === 0) {
+            ctx.fillStyle = '#4fc3f7';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('暂无数据', width / 2, height / 2);
+            return;
+        }
+        
+        const range = maxDistance - minDistance || 1;
+        const padding = 40;
+        const chartWidth = width - padding * 2;
+        const chartHeight = height - padding * 2;
+        
+        // 绘制坐标轴
+        ctx.strokeStyle = '#4fc3f7';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding, padding);
+        ctx.lineTo(padding, height - padding);
+        ctx.lineTo(width - padding, height - padding);
+        ctx.stroke();
+        
+        // 绘制标签
+        ctx.fillStyle = '#4fc3f7';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('时间 (天)', width / 2, height - 10);
+        ctx.save();
+        ctx.translate(15, height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('距离 (AU)', 0, 0);
+        ctx.restore();
+        
+        // 绘制数据线
+        const colors = ['#4fc3f7', '#ff6b6b', '#51cf66', '#ffd43b', '#ff922b', '#845ef7', '#339af0', '#20c997'];
+        let colorIndex = 0;
+        
+        Object.keys(this.chartData.distances).forEach(planetName => {
+            const data = this.chartData.distances[planetName];
+            if (data.length === 0) return;
+            
+            const color = colors[colorIndex % colors.length];
+            colorIndex++;
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            data.forEach((point, index) => {
+                const x = padding + (index / (this.chartData.maxDataPoints - 1)) * chartWidth;
+                const y = height - padding - ((point.value - minDistance) / range) * chartHeight;
+                
+                if (index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            
+            ctx.stroke();
+        });
+        
+        // 更新图例
+        this.updateChartLegend('distance');
+    }
+    
+    // 绘制速度图表
+    drawVelocityChart() {
+        const canvas = document.getElementById('velocity-chart');
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        
+        // 清空画布
+        ctx.clearRect(0, 0, width, height);
+        
+        // 设置样式
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, width, height);
+        
+        // 绘制网格
+        ctx.strokeStyle = 'rgba(79, 195, 247, 0.2)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 10; i++) {
+            const y = (height / 10) * i;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+            ctx.stroke();
+        }
+        
+        // 计算数据范围
+        let maxVelocity = 0;
+        let minVelocity = Infinity;
+        const allData = Object.values(this.chartData.velocities);
+        
+        allData.forEach(dataArray => {
+            dataArray.forEach(point => {
+                maxVelocity = Math.max(maxVelocity, point.value);
+                minVelocity = Math.min(minVelocity, point.value);
+            });
+        });
+        
+        if (maxVelocity === 0) {
+            ctx.fillStyle = '#4fc3f7';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('暂无数据', width / 2, height / 2);
+            return;
+        }
+        
+        const range = maxVelocity - minVelocity || 1;
+        const padding = 40;
+        const chartWidth = width - padding * 2;
+        const chartHeight = height - padding * 2;
+        
+        // 绘制坐标轴
+        ctx.strokeStyle = '#4fc3f7';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding, padding);
+        ctx.lineTo(padding, height - padding);
+        ctx.lineTo(width - padding, height - padding);
+        ctx.stroke();
+        
+        // 绘制标签
+        ctx.fillStyle = '#4fc3f7';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('时间 (天)', width / 2, height - 10);
+        ctx.save();
+        ctx.translate(15, height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('速度 (km/s)', 0, 0);
+        ctx.restore();
+        
+        // 绘制数据线
+        const colors = ['#4fc3f7', '#ff6b6b', '#51cf66', '#ffd43b', '#ff922b', '#845ef7', '#339af0', '#20c997'];
+        let colorIndex = 0;
+        
+        Object.keys(this.chartData.velocities).forEach(planetName => {
+            const data = this.chartData.velocities[planetName];
+            if (data.length === 0) return;
+            
+            const color = colors[colorIndex % colors.length];
+            colorIndex++;
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            data.forEach((point, index) => {
+                const x = padding + (index / (this.chartData.maxDataPoints - 1)) * chartWidth;
+                const y = height - padding - ((point.value - minVelocity) / range) * chartHeight;
+                
+                if (index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            
+            ctx.stroke();
+        });
+        
+        // 更新图例
+        this.updateChartLegend('velocity');
+    }
+    
+    // 更新图例
+    updateChartLegend(chartType) {
+        const legend = document.getElementById('chart-legend');
+        if (!legend) return;
+        
+        const data = chartType === 'distance' ? this.chartData.distances : this.chartData.velocities;
+        const colors = ['#4fc3f7', '#ff6b6b', '#51cf66', '#ffd43b', '#ff922b', '#845ef7', '#339af0', '#20c997'];
+        
+        let html = '<div class="legend-title">图例:</div>';
+        let colorIndex = 0;
+        
+        Object.keys(data).forEach(planetName => {
+            if (data[planetName].length > 0) {
+                const color = colors[colorIndex % colors.length];
+                const lastPoint = data[planetName][data[planetName].length - 1];
+                const value = chartType === 'distance' 
+                    ? lastPoint.value.toFixed(2) + ' AU'
+                    : lastPoint.value.toFixed(2) + ' km/s';
+                
+                html += `
+                    <div class="legend-item">
+                        <span class="legend-color" style="background: ${color}"></span>
+                        <span class="legend-label">${planetName}: ${value}</span>
+                    </div>
+                `;
+                colorIndex++;
+            }
+        });
+        
+        legend.innerHTML = html;
     }
 }
 

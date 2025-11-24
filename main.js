@@ -38,6 +38,9 @@
     // 初始化UI控制器
     const uiController = new UIController(cameraController, planetManager, animationController, eventManager, visualizationManager);
     uiController.init(renderer, camera);
+    
+    // 初始化事件管理器（设置外部引用，需要在uiController之后）
+    eventManager.init(meteorManager, uiController);
 
     // 动画循环
     function animate() {
